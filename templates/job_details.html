@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Job Details - {{ job_name }}</title>
+</head>
+<body>
+
+    <!-- Centered Folor Logo at the top -->
+    <div class="logo-container">
+        <img src="{{ url_for('static', filename='logoFolor.png') }}" alt="Folor Inc. Logo" class="logo">
+    </div>
+
+    <!-- Back to Dashboard Button -->
+    <div class="back-button">
+        <button onclick="window.location.href='{{ url_for('folor_dashboard') }}'">Go Back to Dashboard</button>
+    </div>
+
+    <!-- Job Details Header -->
+    <div class="job-header">
+        <h1>Bid Number: {{ job_id }}</h1>
+        <p>Job Name: {{ job_name }}</p>
+        <p>Address: {{ address }}</p>
+    </div>
+
+    <!-- Trade Cards Grid -->
+    <div class="card-grid">
+        {% for trade in trades %}
+            <div class="trade-card">
+                <h3>{{ trade.name }}</h3>
+                <p>Bids Logged: {{ trade.bid_count }}</p>
+                <button onclick="window.location.href='{{ url_for('view_trade_bids', job_id=job_id, trade_id=trade.id) }}'">View Bids</button>
+            </div>
+        {% endfor %}
+    </div>
+
+</body>
+</html>

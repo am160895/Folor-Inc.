@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Submit a Bid - Folor Inc.</title>
+    <style>
+        body {
+            font-family: 'Roboto Slab', serif;
+            background-image: url("{{ url_for('static', filename='NY_background.jpg') }}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <!-- Main container to center both logo and form -->
+    <div class="center-container">
+        <!-- Logo centered at the top -->
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logoFolor.png') }}" alt="Folor Inc. Logo" class="logo">
+        </div>
+
+    <div class="form-container" id="subcontractorForm">
+            <h1>Subcontractor Bid Submission</h1>
+
+            {% with messages = get_flashed_messages() %}
+              {% if messages %}
+                <div class="flash-messages">
+                    {% for message in messages %}
+                      <p>{{ message }}</p>
+                    {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+
+        <form action="/submit_bid" method="post" enctype="multipart/form-data">
+            <div class="form-section">
+                <label for="subcontractorName">Subcontractor Name:</label>
+                <input type="text" id="subcontractorName" name="subcontractorName" required>
+            </div>
+            <div class="form-section">
+                <label for="subcontractorEmail">Subcontractor Email:</label>
+                <input type="email" id="subcontractorEmail" name="subcontractorEmail" required>
+            </div>
+            <div class="form-section">
+                <label for="jobName">Job Name:</label>
+                <input type="text" id="jobName" name="jobName" required>
+            </div>
+            <div class="form-section">
+                <label for="bidNumber">Bid Number:</label>
+                <input type="text" id="bidNumber" name="bidNumber" required>
+            </div>
+            <div class="form-section">
+                <label for="address">Address:</label>
+                <input type="text" id="address" name="address" required>
+            </div>
+           
+
+
+            <div class="form-section">
+            <label for="trade">Select Trade:</label>
+            <select id="trade" name="trade" required onchange="showLineItems()">
+                
+            <option value="03">03 CONCRETE</option>
+            <option value="04">04 MASONRY</option>
+            <option value="05">05 METALS</option>
+            <option value="06">06 WOOD, PLASTICS, AND COMPOSITES</option>
+            <option value="07">07 THERMAL AND MOISTURE PROTECTION</option>
+            <option value="08">08 OPENINGS</option>
+            <option value="09">09 FINISHES</option>
+            <option value="10">10 SPECIALTIES</option>
+            <option value="11">11 EQUIPMENT</option>
+            <option value="12">12 FURNISHINGS</option>
+            <option value="13">13 SPECIAL CONSTRUCTION</option>
+            <option value="14">14 CONVEYING EQUIPMENT</option>
+            <option value="15">15 MECHANICAL, SPRINKLER AND PLUMBING</option>
+            <option value="16">16 ELECTRICAL</option>
+            </select>
+        </div>
+
+        <div id="lineItems" class="form-section hidden">
+            <table class="line-item-table">
+                <thead>
+                    <tr>
+                        <th>Cost Code</th>
+                        <th>Description</th>
+                        <th>Vendor Cost ($)</th>
+                    </tr>
+                </thead>
+                <tbody id="lineItemFields"></tbody>
+            </table>
+            <button type="button" class="add-line-item-btn" onclick="addCustomLineItemRow()">Add More Line Items</button>
+        </div>
+
+        <div class="form-section">
+                <label for="totalCost">Total Cost ($):</label>
+                <input type="number" id="totalCost" name="totalCost" step="0.01">
+            </div>
+            <div class="form-section">
+                <label for="fileUpload">Upload Proposal Document:</label>
+                <input type="file" id="fileUpload" name="fileUpload" accept=".pdf,.doc,.docx" required>
+            </div>
+            <div class="form-section">
+                <input type="checkbox" id="confirmationCheckbox" required>
+                <label for="confirmationCheckbox">I confirm all information is accurate.</label>
+            </div>
+            <button type="submit" class="submit-btn">Submit Bid</button>
+            
+            <button type="button" onclick="goBack()">Go Back</button>
+    </div>
+        </form>
+    </div>
+
+    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+</body>
+</html>

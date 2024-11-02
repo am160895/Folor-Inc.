@@ -1,0 +1,21 @@
+{
+    "name": "folor-sub-project",
+    "version": "1.0.0",
+    "description": "",
+    "main": "app.js",
+    "scripts": {
+        "start": "node app.js"
+    },
+    "dependencies": {
+        "body-parser": "^1.20.3",
+        "exceljs": "^4.4.0",
+        "express": "^4.21.1",
+        "filestack-js": "^3.34.4",
+        "fs-extra": "^11.2.0",
+        "json2xls": "^0.1.2",
+        "mongoose": "^6.13.3",
+        "multer": "^1.4.4-lts.1"
+    },
+    "author": "",
+    "license": "ISC"
+}
