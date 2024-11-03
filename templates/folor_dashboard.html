@@ -7,32 +7,24 @@
     <title>Folor Dashboard</title>
 </head>
 <body>
+    <!-- Top-right Logout button -->
+    <button onclick="window.location.href='{{ url_for('logout') }}'" class="logout-btn">Logout</button>
+    
     <div class="dashboard-container">
-        <a href="{{ url_for('intro') }}" class="back-btn">Go Back</a>
-        <a href="{{ url_for('logout') }}" class="logout-btn">Log Out</a>
         <h1>Folor Dashboard</h1>
-        
-        <!-- Job Folders List -->
-        {% for job in job_folders %}
-            <div class="job-folder">
-                <h2>{{ job.job_name }} - {{ job.address }}</h2>
-                <p>Bid Count: {{ job.bid_count }}</p>
-                {% for trade in job.trades %}
-                    <div class="trade-folder">
-                        <h3>Trade: {{ trade.trade }}</h3>
-                        <ul>
-                            {% for file in trade.files %}
-                                <li>
-                                    <a href="{{ url_for('download_file', filepath=job.job_id + '_' + job.job_name + '_' + job.address + '/' + trade.trade + '/' + file) }}" target="_blank">
-                                        {{ file }}
-                                    </a>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endfor %}
+        <div class="grid-container">
+            {% for job in job_folders %}
+                <div class="job-card">
+                    <a href="{{ url_for('job_detail', job_id=job.job_id) }}" class="job-link">
+                        <h2>{{ job.job_id }} {{ job.job_name }}, {{ job.address }}</h2>
+                    </a>
+                    <span class="bid-counter">{{ job.bid_count }} bids</span>
+                </div>
+            {% endfor %}
+        </div>
     </div>
+
+    <!-- Bottom-right Go Back button -->
+    <button onclick="window.location.href='{{ url_for('intro') }}'" class="back-btn">Go Back</button>
 </body>
 </html>

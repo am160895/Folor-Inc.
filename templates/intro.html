@@ -8,44 +8,60 @@
     <title>Welcome to Folor Inc.</title>
 </head>
 <body>
-    <div class="intro-container">
-        <img src="{{ url_for('static', filename='logoFolor.png') }}" alt="Folor Inc. Logo" class="logo">
-        <h1>Welcome to Folor Inc. GITHUB</h1>
-        <p>Your partner in subcontracting solutions.<br>Please log in to access the Folor dashboard or start a new bid submission.</p>
+    <div class="intro-container center-container">
+        <img src="{{ url_for('static', filename='logoFolor.png') }}" alt="Folor Inc. Logo" class="logo-centered">
+        <h1>Welcome to Folor Inc.</h1>
+        <p>Your partner in subcontracting solutions.<br>Please log in to access the dashboard or start a new bid submission.</p>
 
-        <!-- Button Group -->
         <div class="button-group">
-            <button id="subcontractorBtn" onclick="window.location.href='/subcontractor_form'">Log my Folor bid</button>
-            <button id="folorIncBtn" onclick="showLoginModal()">Folor Employee Login</button>
+            <button onclick="window.location.href='/subcontractor_form'">Log My Folor Bid</button>
+            <button onclick="showLoginModal()">Folor Employee Login</button>
         </div>
 
-        <!-- Login Modal -->
-<div class="modal" id="loginModal">
-    <h2>Login</h2>
-    <form action="{{ url_for('login') }}" method="POST">
-        <input type="text" name="username" placeholder="Username" required>
-        <input type="password" name="password" placeholder="Password" required>
-        <div class="modal-buttons">
-            <button type="submit">Login</button>
-            <button type="button" onclick="closeModal()">Cancel</button>
-        </div>
-    </form>
-</div>
-<div class="modal-backdrop" id="modalBackdrop"></div>
-
-
-        <!-- Flash Messages -->
-        {% with messages = get_flashed_messages(with_categories=True) %}
-          {% if messages %}
-            <div class="flash-messages">
-                {% for category, message in messages %}
-                  <p class="{{ category }}">{{ message }}</p>
-                {% endfor %}
+       
+       <!-- Login Modal -->
+        <div class="modal" id="loginModal">
+            <h2>Login</h2>
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <div class="modal-buttons">
+                <button onclick="login()">Login</button>
+                <button onclick="closeModal()">Cancel</button>
             </div>
-          {% endif %}
-        {% endwith %}
+        </div>
+        <div class="modal-backdrop" id="modalBackdrop" onclick="closeModal()"></div>
     </div>
 
-    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+    <script>
+        function showLoginModal() {
+            document.getElementById('loginModal').style.display = 'block';
+            document.getElementById('modalBackdrop').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('loginModal').style.display = 'none';
+            document.getElementById('modalBackdrop').style.display = 'none';
+        }
+
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+            }).then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else {
+                    closeModal();
+                    alert("Invalid credentials. Please try again.");
+                }
+            });
+        }
+    </script>
 </body>
 </html>

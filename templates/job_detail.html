@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Job Details</title>
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <div class="header">
+            <h1>{{ job_id }} - {{ job_name }}</h1>
+            <p>{{ address }}</p>
+            <a href="{{ url_for('folor_dashboard') }}" class="back-btn">Go Back to Dashboard</a>
+            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+        </div>
+
+        <!-- Trades Section -->
+        <div class="trades-container">
+            <h2>Trade Submissions</h2>
+            <div class="trade-list">
+                {% for trade in trades %}
+                    <div class="trade-card">
+                        <h3>{{ trade.trade }}</h3>
+                        <p>Bids Submitted: {{ trade.bid_count }}</p>
+                        <ul>
+                            {% for file in trade.files %}
+                                <li><a href="{{ url_for('download_file', filepath=job_id + '/' + trade.trade + '/' + file) }}" target="_blank">{{ file }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

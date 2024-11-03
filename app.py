@@ -22,6 +22,15 @@ def intro():
         return redirect(url_for('folor_dashboard'))
     return render_template('intro.html')
 
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('intro'))
+
+
+
 # Login route
 @app.route('/login', methods=['POST'])
 def login():
@@ -29,7 +38,7 @@ def login():
     password = request.form.get('password')
     if username == 'test' and password == 'test':
         session['logged_in'] = True
-        flash('Login successful! Redirecting to the dashboard.', 'success')
+        flash('Login successful!', 'success')
         return redirect(url_for('folor_dashboard'))
     else:
         flash('Invalid credentials. Please try again.', 'error')
@@ -46,23 +55,18 @@ def folor_dashboard():
     for folder_name in os.listdir(app.config['UPLOAD_FOLDER']):
         job_path = os.path.join(app.config['UPLOAD_FOLDER'], folder_name)
         trades = []
-        bid_count = 0  # Initialize bid count
+        bid_count = 0
         if os.path.isdir(job_path):
             for trade_name in os.listdir(job_path):
                 trade_path = os.path.join(job_path, trade_name)
                 if os.path.isdir(trade_path):
                     bid_files = [f for f in os.listdir(trade_path) if f.endswith(('.pdf', '.doc', '.docx'))]
-                    bid_count += len(bid_files)  # Count the bids for this trade
-                    trades.append({
-                        "trade": trade_name,
-                        "files": bid_files
-                    })
+                    bid_count += len(bid_files)
             job_folders.append({
-                "job_id": folder_name.split('_')[0],  # Extract job ID from folder name
-                "job_name": folder_name.split('_')[1], # Extract job name from folder name
-                "address": folder_name.split('_')[2],  # Extract address from folder name
-                "trades": trades,
-                "bid_count": bid_count  # Include bid count
+                "job_id": folder_name.split('_')[0],
+                "job_name": folder_name.split('_')[1],
+                "address": folder_name.split('_')[2].replace('_', ' '),
+                "bid_count": bid_count
             })
     
     return render_template('Folor_Dashboard.html', job_folders=job_folders)
@@ -75,34 +79,54 @@ def download_file(filepath):
 # Route to handle form submission
 @app.route('/submit_bid', methods=['POST'])
 def submit_bid():
+    # Retrieve form data
     subcontractor_name = request.form.get('subcontractorName')
     job_name = request.form.get('jobName')
     bid_number = request.form.get('bidNumber')
     address = request.form.get('address')
     trade = request.form.get('trade')
+    cost = request.form.get('cost')
     file = request.files.get('fileUpload')
 
-    if not all([subcontractor_name, job_name, bid_number, address, trade, file]):
+    # Ensure all required fields are filled
+    if not all([subcontractor_name, job_name, bid_number, address, trade, cost, file]):
         flash("All fields are required, including the file.")
         return redirect(url_for('subcontractor_form'))
 
-    job_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"{bid_number}_{job_name}_{address.replace(' ', '_')}", trade)
-    os.makedirs(job_folder, exist_ok=True)
-
+    # Check if the file is allowed
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        file.save(os.path.join(job_folder, filename))
 
-    with open(os.path.join(job_folder, "bid_summary.txt"), "w") as f:
-        f.write(f"Subcontractor: {subcontractor_name}\n")
-        f.write(f"Job Name: {job_name}\n")
-        f.write(f"Bid Number: {bid_number}\n")
-        f.write(f"Address: {address}\n")
-        f.write(f"Trade: {trade}\n")
-        f.write(f"Uploaded File: {filename}\n")
+        # Create the job directory path based on job name and address
+        job_folder = os.path.join(app.config['UPLOAD_FOLDER'], f"{bid_number}_{job_name}_{address.replace(' ', '_')}", trade)
+        os.makedirs(job_folder, exist_ok=True)
 
-    flash("Thank you for your submission. Your bid has been successfully submitted!")
+        # Save the uploaded file to the job folder
+        file_path = os.path.join(job_folder, filename)
+        file.save(file_path)
+
+        # Save form data in a bid_summary.txt file within the same directory
+        summary_path = os.path.join(job_folder, "bid_summary.txt")
+        with open(summary_path, "w") as f:
+            f.write(f"Subcontractor: {subcontractor_name}\n")
+            f.write(f"Job Name: {job_name}\n")
+            f.write(f"Bid Number: {bid_number}\n")
+            f.write(f"Address: {address}\n")
+            f.write(f"Trade: {trade}\n")
+            f.write(f"Total Cost: ${cost}\n")
+            f.write(f"Uploaded File: {filename}\n")
+
+        flash("Thank you for your submission. Your bid has been successfully submitted!", 'success')
+    else:
+        flash("Invalid file type. Only PDF, DOC, and DOCX files are allowed.", 'error')
+        return redirect(url_for('subcontractor_form'))
+
     return redirect(url_for('folor_dashboard'))
+
+# Route for subcontractor form
+@app.route('/subcontractor_form')
+def subcontractor_form():
+    return render_template('SubBidForm.html')
 
 # Route for job details (specific job view)
 @app.route('/job/<job_id>')
@@ -121,17 +145,11 @@ def job_detail(job_id):
             files = [f for f in os.listdir(trade_path) if f.endswith(('.pdf', '.doc', '.docx'))]
             trades.append({
                 "trade": trade_name,
-                "files": files
+                "files": files,
+                "bid_count": len(files)  # Count of bids for each trade
             })
 
     return render_template('job_detail.html', job_id=job_id, job_name=folder_name.split('_')[1], address=folder_name.split('_')[2], trades=trades)
-
-# Logout route
-@app.route('/logout')
-def logout():
-    session.pop('logged_in', None)
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('intro'))
 
 if __name__ == '__main__':
     app.run(debug=True)
