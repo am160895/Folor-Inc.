@@ -1,11 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Decision } from "@/lib/types";
+import type { Decision, Project } from "@/lib/types";
 import { DecisionFlow } from "@/components/DecisionFlow";
 import { StatusPill } from "@/components/shared";
 
-export function GraphView({ decisions }: { decisions: Decision[] }) {
+export function GraphView({
+  decisions,
+  projects,
+  projectFilter,
+  onSelectProject,
+  onEditDecision,
+}: {
+  decisions: Decision[];
+  projects: Project[];
+  projectFilter: number | "all";
+  onSelectProject: (id: number | "all") => void;
+  onEditDecision: (id: string) => void;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(decisions[0]?.id ?? null);
   const selected = decisions.find((d) => d.id === selectedId) ?? decisions[0] ?? null;
 
@@ -36,6 +48,31 @@ export function GraphView({ decisions }: { decisions: Decision[] }) {
           <p className="hidden text-xs text-muted-foreground md:block">
             One decision, fully explained by its connections.
           </p>
+          <div className="no-scrollbar mt-2.5 flex gap-1.5 overflow-x-auto pb-1">
+            <button
+              onClick={() => onSelectProject("all")}
+              className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                projectFilter === "all"
+                  ? "border-primary/50 bg-primary/[0.12] text-foreground"
+                  : "border-border/70 bg-white/[0.02] text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              All
+            </button>
+            {projects.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => onSelectProject(p.id)}
+                className={`max-w-[140px] shrink-0 truncate rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                  projectFilter === p.id
+                    ? "border-primary/50 bg-primary/[0.12] text-foreground"
+                    : "border-border/70 bg-white/[0.02] text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="no-scrollbar flex gap-2 overflow-x-auto p-4 md:flex-col md:gap-1.5">
           {decisions.map((d) => (
@@ -72,7 +109,7 @@ export function GraphView({ decisions }: { decisions: Decision[] }) {
                 {selected.title}
               </h3>
             </div>
-            <DecisionFlow decision={selected} onNavigate={(id) => setSelectedId(id)} />
+            <DecisionFlow decision={selected} onNavigate={(id) => setSelectedId(id)} onEdit={onEditDecision} />
             <Legend />
           </>
         )}

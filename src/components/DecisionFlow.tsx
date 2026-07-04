@@ -44,6 +44,8 @@ interface NodeData {
   subtitle?: string;
   /** When set, clicking the node opens this decision in the graph. */
   jumpTo?: string;
+  /** When true, clicking the node opens the decision editor. */
+  editable?: boolean;
 }
 
 const KIND_STYLE: Record<NodeKind, { icon: typeof Users; ring: string; text: string }> = {
@@ -68,7 +70,7 @@ function GraphNode({ data }: NodeProps<NodeData>) {
     <div
       className={`relative flex items-center gap-2.5 rounded-xl border ${style.ring} bg-surface/95 px-3.5 py-2.5 shadow-lg backdrop-blur ${
         isCenter ? "shadow-[0_0_40px_-8px_rgba(124,92,255,0.6)]" : ""
-      } ${data.jumpTo ? "cursor-pointer hover:border-white/40" : ""}`}
+      } ${data.jumpTo || data.editable ? "cursor-pointer hover:border-white/40" : ""}`}
       style={{ maxWidth: isCenter ? 280 : 235 }}
     >
       <Handle type="target" position={Position.Top} />
@@ -99,9 +101,12 @@ const nodeTypes = { graphNode: GraphNode };
 export function DecisionFlow({
   decision,
   onNavigate,
+  onEdit,
 }: {
   decision: Decision;
   onNavigate?: (decisionId: string) => void;
+  /** Called when an editable node is clicked (center, reason, impact, origin). */
+  onEdit?: (decisionId: string) => void;
 }) {
   const { nodes, edges } = useMemo(() => {
     const n: Node<NodeData>[] = [];
@@ -111,7 +116,7 @@ export function DecisionFlow({
       id: "center",
       type: "graphNode",
       position: { x: 380, y: 260 },
-      data: { kind: "center", title: decision.title, subtitle: decision.id },
+      data: { kind: "center", title: decision.title, subtitle: decision.id, editable: true },
     });
 
     // Causality chain: caused by (upstream, left) -> center -> led to (right).
@@ -128,6 +133,14 @@ export function DecisionFlow({
         },
       });
       e.push(edge("causedBy", "center", false, true));
+    } else if (decision.origin) {
+      n.push({
+        id: "origin",
+        type: "graphNode",
+        position: { x: 60, y: 260 },
+        data: { kind: "causedBy", title: decision.origin, subtitle: "How it came about", editable: true },
+      });
+      e.push(edge("origin", "center", false, true));
     }
 
     decision.ledTo.slice(0, 3).forEach((ref, i) => {
@@ -173,6 +186,7 @@ export function DecisionFlow({
           title: "Reason",
           subtitle:
             decision.reason.length > 42 ? decision.reason.slice(0, 39) + "…" : decision.reason,
+          editable: true,
         },
       });
       e.push(edge("reason", "center"));
@@ -186,6 +200,7 @@ export function DecisionFlow({
         kind: "cost",
         title: decision.costImpact ? "Cost impact" : "No cost impact",
         subtitle: decision.costImpact ?? "$0",
+        editable: true,
       },
     });
     e.push(edge("center", "cost"));
@@ -198,6 +213,7 @@ export function DecisionFlow({
         kind: "schedule",
         title: decision.scheduleImpact ? "Schedule impact" : "No schedule impact",
         subtitle: decision.scheduleImpact ?? "0 days",
+        editable: true,
       },
     });
     e.push(edge("center", "schedule"));
@@ -241,8 +257,9 @@ export function DecisionFlow({
   const handleNodeClick = useCallback(
     (_e: React.MouseEvent, node: Node<NodeData>) => {
       if (node.data.jumpTo && onNavigate) onNavigate(node.data.jumpTo);
+      else if (node.data.editable && onEdit) onEdit(decision.id);
     },
-    [onNavigate]
+    [onNavigate, onEdit, decision.id]
   );
 
   return (

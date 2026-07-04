@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sessionOf, unauthorized } from "@/lib/auth";
 import { createDecision, getDecision, listDecisions, listUsers } from "@/lib/db";
 import { notifyApprovers, notifyWatchers } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!sessionOf(req)) return unauthorized();
   return NextResponse.json({ decisions: listDecisions() });
 }
 
 export async function POST(req: NextRequest) {
+  if (!sessionOf(req)) return unauthorized();
   const body = await req.json();
 
   if (!body?.title?.trim() || !body?.summary?.trim()) {
@@ -27,6 +30,7 @@ export async function POST(req: NextRequest) {
     watcherIds: Array.isArray(body.watcherIds) ? body.watcherIds : [],
     approverIds: Array.isArray(body.approverIds) ? body.approverIds : [],
     causedById: body.causedById || null,
+    origin: body.origin || null,
     evidence: Array.isArray(body.evidence) ? body.evidence : [],
     recordedBy: "Folor Admin",
   });

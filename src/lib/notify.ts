@@ -1,5 +1,5 @@
 import type { Decision, User } from "./types";
-import { recordNotification } from "./db";
+import { recordNotification, CONSENT_TEXT } from "./db";
 
 // ---------------------------------------------------------------------------
 // Notification sending.
@@ -39,7 +39,7 @@ export async function notifyApprovers(
   for (const { user, token } of approvers) {
     const link = base + "/approve/" + token;
     const text =
-      "Folor DecisionGraph: " +
+      "Ledger: " +
       decision.recordedBy +
       " recorded a decision on " +
       decision.projectName +
@@ -88,7 +88,7 @@ export async function notifyWatchers(decision: Decision, watchers: User[]): Prom
   for (const user of watchers) {
     if (!(user.notifyEmail && user.email)) continue;
     const text =
-      "Folor DecisionGraph: " +
+      "Ledger: " +
       decision.recordedBy +
       " recorded a decision on " +
       decision.projectName +
@@ -126,7 +126,7 @@ async function sendEmail(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || "Folor DecisionGraph <onboarding@resend.dev>",
+        from: process.env.EMAIL_FROM || "Folor Ledger <onboarding@resend.dev>",
         to: [to],
         subject,
         html,
@@ -181,11 +181,12 @@ function decisionCardHtml(decision: Decision): string {
 function approvalEmailHtml(decision: Decision, link: string): string {
   return (
     '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#111">' +
-    '<p style="font-size:13px;color:#666;margin:0 0 16px">Folor · DecisionGraph</p>' +
-    '<h2 style="margin:0 0 8px;font-size:20px">A decision needs your approval</h2>' +
+    '<p style="font-size:13px;color:#666;margin:0 0 16px">Folor · Ledger</p>' +
+    '<h2 style="margin:0 0 8px;font-size:20px">A decision needs your acknowledgement</h2>' +
     decisionCardHtml(decision) +
-    '<a href="' + link + '" style="display:inline-block;background:#6d4aff;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600">Review &amp; respond</a>' +
-    '<p style="font-size:12px;color:#999;margin-top:20px">You can approve or decline in one tap. This link is unique to you.</p>' +
+    '<a href="' + link + '" style="display:inline-block;background:#6d4aff;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600">Review &amp; acknowledge</a>' +
+    '<p style="font-size:11px;color:#999;margin-top:20px;line-height:1.5">' + CONSENT_TEXT + '</p>' +
+    '<p style="font-size:11px;color:#bbb;margin-top:8px">This link is unique to you.</p>' +
     "</div>"
   );
 }
@@ -193,7 +194,7 @@ function approvalEmailHtml(decision: Decision, link: string): string {
 function fyiEmailHtml(decision: Decision): string {
   return (
     '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#111">' +
-    '<p style="font-size:13px;color:#666;margin:0 0 16px">Folor · DecisionGraph</p>' +
+    '<p style="font-size:13px;color:#666;margin:0 0 16px">Folor · Ledger</p>' +
     '<h2 style="margin:0 0 8px;font-size:20px">A decision was recorded</h2>' +
     '<p style="margin:0 0 4px;color:#444">You are on the visibility list — no action needed.</p>' +
     decisionCardHtml(decision) +

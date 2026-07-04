@@ -1,23 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sessionOf, unauthorized } from "@/lib/auth";
-import { addEvidence } from "@/lib/db";
+import { getDecision, logEvent } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+
+const ALLOWED = ["pdf_exported", "evidence_generated"] as const;
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   if (!sessionOf(req)) return unauthorized();
   const body = await req.json();
-  if (!body?.label || !body?.kind) {
-    return NextResponse.json({ error: "Evidence needs a kind and label." }, { status: 400 });
+  if (!ALLOWED.includes(body?.type)) {
+    return NextResponse.json({ error: "Invalid event type." }, { status: 400 });
   }
-  const decision = addEvidence(params.id, {
-    kind: body.kind,
-    label: body.label,
-    meta: body.meta,
-    file: body.file,
-  });
-  if (!decision) {
+  if (!getDecision(params.id)) {
     return NextResponse.json({ error: "Decision not found." }, { status: 404 });
   }
-  return NextResponse.json({ decision });
+  logEvent(params.id, body.type, "Folor Admin", body.detail ?? "");
+  return NextResponse.json({ ok: true });
 }

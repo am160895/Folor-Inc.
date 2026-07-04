@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApprovalByToken, respondToApproval } from "@/lib/db";
+import { getApprovalByToken, respondToApproval, markApprovalViewed, CONSENT_TEXT, ACK_BUTTON_TEXT } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -11,11 +11,14 @@ export async function GET(
   if (!found) {
     return NextResponse.json({ error: "This approval link is not valid." }, { status: 404 });
   }
+  markApprovalViewed(params.token);
   const { decision } = found;
   return NextResponse.json({
     approverName: found.approverName,
     approverRole: found.approverRole,
     status: found.status,
+    consentText: CONSENT_TEXT,
+    buttonText: ACK_BUTTON_TEXT,
     decision: {
       id: decision.id,
       title: decision.title,
@@ -42,7 +45,16 @@ export async function POST(
   if (action !== "approved" && action !== "declined") {
     return NextResponse.json({ error: "Invalid action." }, { status: 400 });
   }
-  const updated = respondToApproval(params.token, action);
+  const ip =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "local";
+  const updated = respondToApproval(params.token, action, {
+    role: body?.role,
+    company: body?.company,
+    ip,
+    userAgent: req.headers.get("user-agent") ?? undefined,
+  });
   if (!updated) {
     return NextResponse.json({ error: "This approval link is not valid." }, { status: 404 });
   }

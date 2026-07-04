@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ShieldCheck, TrendingUp, Clock3, FolderKanban, Plus, Check } from "lucide-react";
+import { ShieldCheck, TrendingUp, Clock3, FolderKanban, Plus, Check, ChevronRight, ArrowLeft } from "lucide-react";
 import type { Decision, Project } from "@/lib/types";
 import { CaptureBar } from "@/components/CaptureBar";
 import { DecisionCard } from "@/components/DecisionCard";
@@ -15,6 +15,7 @@ export function DecisionsView({
   onOpen,
   onCapture,
   onCreateProject,
+  onSelectProject,
 }: {
   decisions: Decision[];
   projects: Project[];
@@ -22,6 +23,7 @@ export function DecisionsView({
   onOpen: (d: Decision) => void;
   onCapture: (mode: "speak" | "type" | "upload") => void;
   onCreateProject: (name: string) => Promise<void>;
+  onSelectProject: (id: number | "all") => void;
 }) {
   const [addingProject, setAddingProject] = useState(false);
   const [newName, setNewName] = useState("");
@@ -48,6 +50,26 @@ export function DecisionsView({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+      {/* Hero */}
+      <div className="relative mb-6 overflow-hidden rounded-2xl border border-border/60 ring-hairline">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="https://assets.awwwards.com/awards/element/2025/03/67d19efadcc35682823628_static.jpeg"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-35"
+          onError={(e) => ((e.target as HTMLImageElement).style.display = "none")}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-background/30" />
+        <div className="relative px-6 py-7 sm:px-8 sm:py-9">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            Every decision. Recorded.
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground sm:text-base">
+            Every decision. Protected. Say it, send it for approval, prove it forever.
+          </p>
+        </div>
+      </div>
+
       <CaptureBar onCapture={onCapture} />
 
       <motion.div
@@ -72,9 +94,23 @@ export function DecisionsView({
       {/* Projects header + add-from-home */}
       <div className="mt-8 flex items-center justify-between gap-3 sm:mt-10">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Projects</h2>
+          {projectFilter !== "all" ? (
+            <button
+              onClick={() => onSelectProject("all")}
+              className="mb-1 flex items-center gap-1.5 text-xs text-primary hover:underline"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> All projects
+            </button>
+          ) : null}
+          <h2 className="text-lg font-semibold tracking-tight">
+            {projectFilter === "all"
+              ? "Projects"
+              : projects.find((p) => p.id === projectFilter)?.name ?? "Projects"}
+          </h2>
           <p className="text-sm text-muted-foreground">
-            Every decision lives in its project — nothing gets lost.
+            {projectFilter === "all"
+              ? "Every decision lives in its project — tap a folder to open it."
+              : "All decisions on this project."}
           </p>
         </div>
         {addingProject ? (
@@ -108,7 +144,11 @@ export function DecisionsView({
       <div className="mt-5 space-y-8">
         {groups.map(({ project, items }) => (
           <section key={project.id}>
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-white/[0.02] px-4 py-3">
+            <button
+              onClick={() => onSelectProject(projectFilter === project.id ? "all" : project.id)}
+              className="group mb-3 flex w-full items-center justify-between gap-3 rounded-xl border border-border/60 bg-white/[0.02] px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-white/[0.04]"
+              title={projectFilter === project.id ? "Back to all projects" : "Open this project"}
+            >
               <div className="flex min-w-0 items-center gap-2.5">
                 <FolderKanban className="h-4 w-4 shrink-0 text-primary" />
                 <span className="truncate text-sm font-semibold text-foreground">
@@ -118,8 +158,11 @@ export function DecisionsView({
                   {items.length} decision{items.length !== 1 ? "s" : ""}
                 </span>
               </div>
-              {project.members.length > 0 && <AvatarStack people={project.members} />}
-            </div>
+              <span className="flex shrink-0 items-center gap-2">
+                {project.members.length > 0 && <AvatarStack people={project.members} />}
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </button>
 
             {items.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-border/60 px-6 py-6 text-center text-sm text-muted-foreground">

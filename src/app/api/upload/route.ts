@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sessionOf, unauthorized } from "@/lib/auth";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -20,6 +21,7 @@ function human(bytes: number): string {
 }
 
 export async function POST(req: NextRequest) {
+  if (!sessionOf(req)) return unauthorized();
   const form = await req.formData();
   const file = form.get("file");
   if (!(file instanceof File)) {

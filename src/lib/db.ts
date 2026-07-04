@@ -10,6 +10,10 @@ import type {
   Evidence,
   DecisionStatus,
   DecisionRef,
+  Team,
+  WorkspaceSettings,
+  AuditEvent,
+  AuditEventType,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -52,6 +56,8 @@ interface StoredDecision {
   watcherIds: number[];
   /** The decision that caused this one. */
   causedById: string | null;
+  /** Free-form origin, e.g. "Site visit", "Phone call". */
+  origin: string | null;
   evidence: Evidence[];
 }
 
@@ -64,6 +70,32 @@ interface StoredApproval {
   token: string;
   status: "pending" | "approved" | "declined";
   respondedAt: string | null;
+  viewedAt: string | null;
+  ackRole: string | null;
+  ackCompany: string | null;
+  ackEmail: string | null;
+  ip: string | null;
+  device: string | null;
+  userAgent: string | null;
+  buttonText: string | null;
+  consentText: string | null;
+  snapshot: any | null;
+}
+
+interface StoredTeam {
+  id: number;
+  name: string;
+  memberIds: number[];
+  password: string | null;
+  createdAt: string;
+}
+
+interface StoredSession {
+  token: string;
+  email: string;
+  name: string;
+  isAdmin: boolean;
+  createdAt: string;
 }
 
 interface StoredNotification {
@@ -80,15 +112,41 @@ interface StoredNotification {
   createdAt: string;
 }
 
+interface StoredEvent {
+  id: number;
+  decisionId: string;
+  type: AuditEventType;
+  at: string;
+  actor: string;
+  detail: string;
+}
+
+export const CONSENT_TEXT =
+  "By clicking acknowledge, you agree this electronic acknowledgement may be used as a project record and evidence of your acknowledgement of the decision described above.";
+export const ACK_BUTTON_TEXT = "I acknowledge this accurately reflects the decision.";
+
 interface Store {
   nextDecisionNumber: number;
-  nextIds: { user: number; project: number; approval: number; notification: number };
+  nextIds: { user: number; project: number; approval: number; notification: number; team: number; event: number };
   users: StoredUser[];
   projects: StoredProject[];
   decisions: StoredDecision[];
   approvals: StoredApproval[];
   notifications: StoredNotification[];
+  teams: StoredTeam[];
+  settings: WorkspaceSettings;
+  events: StoredEvent[];
+  sessions: StoredSession[];
 }
+
+const DEFAULT_SETTINGS: WorkspaceSettings = {
+  workspaceName: "Folor Inc.",
+  adminPassword: "ledger123",
+  currency: "$",
+  autoTeam: true,
+  requireReason: false,
+  defaultVisibility: "team",
+};
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "decisiongraph.json");
@@ -98,12 +156,12 @@ function seedStore(): Store {
   const now = new Date().toISOString();
   return {
     nextDecisionNumber: 1001,
-    nextIds: { user: 1, project: 2, approval: 1, notification: 1 },
+    nextIds: { user: 1, project: 2, approval: 1, notification: 1, team: 1, event: 1 },
     users: [],
     projects: [{ id: 1, name: "Example Project", memberIds: [], createdAt: now }],
     decisions: [
       {
-        id: "DG-1000",
+        id: "LG-1000",
         title: "Example — Center lobby lights on soffit",
         summary:
           "Linear lights are to be centered on the soffit, not aligned to the ceiling grid.",
@@ -118,6 +176,7 @@ function seedStore(): Store {
         createdAt: now,
         watcherIds: [],
         causedById: null,
+        origin: "Site visit",
         evidence: [
           { kind: "voice", label: "Voice note", meta: "0:38 · onsite" },
           { kind: "photo", label: "Site photo", meta: "Lobby soffit, east" },
@@ -126,6 +185,10 @@ function seedStore(): Store {
     ],
     approvals: [],
     notifications: [],
+    teams: [],
+    settings: { ...DEFAULT_SETTINGS },
+    events: [],
+    sessions: [],
   };
 }
 
@@ -137,11 +200,27 @@ function normalize(s: Store): Store {
   s.decisions.forEach((d: any) => {
     if (!Array.isArray(d.watcherIds)) d.watcherIds = Array.isArray(d.personIds) ? d.personIds : [];
     if (d.causedById === undefined) d.causedById = null;
+    if (d.origin === undefined) d.origin = null;
     if (!Array.isArray(d.evidence)) d.evidence = [];
   });
   s.notifications.forEach((n: any) => {
     if (!n.kind) n.kind = "approval";
   });
+  s.approvals.forEach((a: any) => {
+    if (a.viewedAt === undefined) a.viewedAt = null;
+    ["ackRole","ackCompany","ackEmail","ip","device","userAgent","buttonText","consentText","snapshot"].forEach((k) => {
+      if (a[k] === undefined) a[k] = null;
+    });
+  });
+  if (!Array.isArray((s as any).events)) (s as any).events = [];
+  if (!(s.nextIds as any).event) (s.nextIds as any).event = 1;
+  if (!Array.isArray(s.teams)) s.teams = [];
+  s.teams.forEach((t: any) => {
+    if (t.password === undefined) t.password = null;
+  });
+  if (!Array.isArray((s as any).sessions)) (s as any).sessions = [];
+  if (!(s.nextIds as any).team) (s.nextIds as any).team = 1;
+  s.settings = { ...DEFAULT_SETTINGS, ...(s.settings ?? {}) };
   return s;
 }
 
@@ -190,6 +269,25 @@ export function initialsOf(name: string): string {
     .toUpperCase();
 }
 
+/** Append-only audit log. Events are never edited or removed. */
+export function logEvent(
+  decisionId: string,
+  type: AuditEventType,
+  actor: string,
+  detail: string
+) {
+  const s = db();
+  s.events.push({
+    id: s.nextIds.event++,
+    decisionId,
+    type,
+    at: new Date().toISOString(),
+    actor,
+    detail,
+  });
+  save();
+}
+
 // ---------------------------------------------------------------------------
 // Mappers
 // ---------------------------------------------------------------------------
@@ -236,6 +334,16 @@ function mapDecision(d: StoredDecision): Decision {
       status: a.status,
       token: a.token,
       respondedAt: a.respondedAt,
+      viewedAt: a.viewedAt,
+      ackRole: a.ackRole,
+      ackCompany: a.ackCompany,
+      ackEmail: a.ackEmail,
+      ip: a.ip,
+      device: a.device,
+      userAgent: a.userAgent,
+      buttonText: a.buttonText,
+      consentText: a.consentText,
+      snapshot: a.snapshot,
     }));
 
   const watchers = usersByIds(d.watcherIds.filter((id) => !approvals.some((a) => a.userId === id)));
@@ -300,9 +408,13 @@ function mapDecision(d: StoredDecision): Decision {
     evidence: d.evidence,
     visibleTo: roles,
     causedBy,
+    origin: d.origin,
     ledTo,
     isExample: d.isExample,
     confidence: Math.min(confidence, 98),
+    events: s.events
+      .filter((ev) => ev.decisionId === d.id)
+      .map((ev) => ({ id: ev.id, type: ev.type, at: ev.at, actor: ev.actor, detail: ev.detail })),
   };
 }
 
@@ -321,6 +433,7 @@ export function createUser(input: {
   phone?: string | null;
   notifyEmail?: boolean;
   notifySms?: boolean;
+  teamId?: number | null;
 }): User {
   const s = db();
   const user: StoredUser = {
@@ -334,6 +447,10 @@ export function createUser(input: {
     createdAt: new Date().toISOString(),
   };
   s.users.push(user);
+  if (input.teamId) {
+    const team = s.teams.find((t) => t.id === input.teamId);
+    if (team && !team.memberIds.includes(user.id)) team.memberIds.push(user.id);
+  }
   save();
   return mapUser(user);
 }
@@ -406,6 +523,7 @@ export interface NewDecisionInput {
   watcherIds: number[];
   approverIds: number[];
   causedById?: string | null;
+  origin?: string | null;
   evidence?: Evidence[];
   recordedBy?: string;
 }
@@ -418,7 +536,7 @@ export function createDecision(input: NewDecisionInput): Decision {
     projectId = createProject(input.newProjectName).id;
   }
 
-  const id = "DG-" + s.nextDecisionNumber++;
+  const id = "LG-" + s.nextDecisionNumber++;
   const validIds = (ids: number[]) => ids.filter((uid) => s.users.some((u) => u.id === uid));
   const approverIds = Array.from(new Set(validIds(input.approverIds)));
   const watcherIds = Array.from(
@@ -444,6 +562,7 @@ export function createDecision(input: NewDecisionInput): Decision {
     createdAt: new Date().toISOString(),
     watcherIds,
     causedById,
+    origin: causedById ? null : input.origin?.trim() || null,
     evidence: input.evidence ?? [],
   });
 
@@ -458,11 +577,21 @@ export function createDecision(input: NewDecisionInput): Decision {
       token: newToken(),
       status: "pending",
       respondedAt: null,
+      viewedAt: null,
+      ackRole: null,
+      ackCompany: null,
+      ackEmail: null,
+      ip: null,
+      device: null,
+      userAgent: null,
+      buttonText: null,
+      consentText: null,
+      snapshot: null,
     });
   });
 
   // Everyone on the decision automatically joins the project team.
-  if (projectId) {
+  if (projectId && db().settings.autoTeam) {
     const project = s.projects.find((p) => p.id === projectId);
     if (project) {
       project.memberIds = Array.from(
@@ -472,6 +601,7 @@ export function createDecision(input: NewDecisionInput): Decision {
   }
 
   save();
+  logEvent(id, "created", input.recordedBy ?? "Folor Admin", "Decision recorded" + (projectId ? " on project" : ""));
   return getDecision(id)!;
 }
 
@@ -481,6 +611,7 @@ export function addEvidence(decisionId: string, evidence: Evidence): Decision | 
   if (!d) return null;
   d.evidence.push(evidence);
   save();
+  logEvent(decisionId, "evidence_added", "Folor Admin", evidence.kind + ": " + evidence.label);
   return getDecision(decisionId);
 }
 
@@ -514,6 +645,12 @@ export function recordNotification(n: {
     createdAt: new Date().toISOString(),
   });
   save();
+  logEvent(
+    n.decisionId,
+    "sent",
+    user?.name ?? n.destination,
+    (n.kind === "approval" ? "Acknowledgement request" : "FYI notice") + " sent by " + n.channel + " to " + n.destination + (n.status === "demo" ? " (demo mode)" : "")
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -543,15 +680,284 @@ export function getApprovalByToken(token: string): ApprovalLookup | null {
   };
 }
 
+export interface AckMeta {
+  role?: string;
+  company?: string;
+  ip?: string;
+  userAgent?: string;
+}
+
+function deviceOf(ua: string | undefined): string | null {
+  if (!ua) return null;
+  if (/iPhone|iPad|iPod/i.test(ua)) return "iOS";
+  if (/Android/i.test(ua)) return "Android";
+  if (/Mobile/i.test(ua)) return "Mobile";
+  return "Desktop";
+}
+
 export function respondToApproval(
   token: string,
-  action: "approved" | "declined"
+  action: "approved" | "declined",
+  meta: AckMeta = {}
 ): ApprovalLookup | null {
   const s = db();
   const a = s.approvals.find((x) => x.token === token);
   if (!a) return null;
+  const d = s.decisions.find((x) => x.id === a.decisionId);
+  const user = s.users.find((u) => u.id === a.userId);
   a.status = action;
   a.respondedAt = new Date().toISOString();
+  a.ackRole = meta.role?.trim() || a.role;
+  a.ackCompany = meta.company?.trim() || null;
+  a.ackEmail = user?.email ?? null;
+  a.ip = meta.ip ?? null;
+  a.userAgent = meta.userAgent ?? null;
+  a.device = deviceOf(meta.userAgent);
+  a.buttonText =
+    action === "approved" ? ACK_BUTTON_TEXT : "This does not accurately reflect the decision.";
+  a.consentText = CONSENT_TEXT;
+  if (d) {
+    const date = new Date(d.createdAt);
+    a.snapshot = {
+      title: d.title,
+      summary: d.summary,
+      reason: d.reason,
+      location: d.location,
+      costImpact: d.costImpact,
+      scheduleImpact: d.scheduleImpact,
+      dateLabel: date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+    };
+  }
   save();
+  logEvent(
+    a.decisionId,
+    action === "approved" ? "acknowledged" : "declined",
+    a.name,
+    (a.ackRole ?? a.role) + (a.ackCompany ? " · " + a.ackCompany : "") + (a.ip ? " · IP " + a.ip : "")
+  );
   return getApprovalByToken(token);
+}
+
+/** SHA-256 reference over the decision's full record for the evidence package. */
+export function packageHash(id: string): string | null {
+  const d = getDecision(id);
+  if (!d) return null;
+  const canonical = JSON.stringify({
+    id: d.id, title: d.title, summary: d.summary, reason: d.reason, location: d.location,
+    cost: d.costImpact, schedule: d.scheduleImpact, createdAt: d.createdAt,
+    approvals: d.approvals.map((x) => ({ n: x.name, s: x.status, t: x.respondedAt })),
+    evidence: d.evidence.map((e) => e.label),
+    events: d.events.map((e) => ({ t: e.type, at: e.at })),
+  });
+  return crypto.createHash("sha256").update(canonical).digest("hex");
+}
+
+
+// ---------------------------------------------------------------------------
+// Teams
+// ---------------------------------------------------------------------------
+
+export function listTeams(): Team[] {
+  const s = db();
+  return [...s.teams]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((t) => ({ id: t.id, name: t.name, memberIds: t.memberIds, members: usersByIds(t.memberIds), password: t.password }));
+}
+
+export function createTeam(name: string, memberIds: number[]): Team {
+  const s = db();
+  const team: StoredTeam = {
+    id: s.nextIds.team++,
+    name: name.trim(),
+    memberIds: memberIds.filter((id) => s.users.some((u) => u.id === id)),
+    password: null,
+    createdAt: new Date().toISOString(),
+  };
+  s.teams.push(team);
+  save();
+  return { id: team.id, name: team.name, memberIds: team.memberIds, members: usersByIds(team.memberIds), password: null };
+}
+
+export function deleteTeam(id: number): void {
+  const s = db();
+  s.teams = s.teams.filter((t) => t.id !== id);
+  save();
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+export function getSettings(): WorkspaceSettings {
+  return { ...db().settings };
+}
+
+export function updateSettings(patch: Partial<WorkspaceSettings>): WorkspaceSettings {
+  const s = db();
+  s.settings = { ...s.settings, ...patch };
+  save();
+  return { ...s.settings };
+}
+
+/** Read receipt: record the first time an approver opens their link. */
+export function markApprovalViewed(token: string): void {
+  const s = db();
+  const a = s.approvals.find((x) => x.token === token);
+  if (a && !a.viewedAt) {
+    a.viewedAt = new Date().toISOString();
+    save();
+    logEvent(a.decisionId, "opened", a.name, "Opened their acknowledgement link");
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// Editing
+// ---------------------------------------------------------------------------
+
+export function updateUser(
+  id: number,
+  patch: Partial<Pick<StoredUser, "name" | "role" | "email" | "phone" | "notifyEmail" | "notifySms">>
+): User | null {
+  const s = db();
+  const u = s.users.find((x) => x.id === id);
+  if (!u) return null;
+  if (patch.name?.trim()) u.name = patch.name.trim();
+  if (patch.role?.trim()) u.role = patch.role.trim();
+  if (patch.email !== undefined) u.email = patch.email?.trim() || null;
+  if (patch.phone !== undefined) u.phone = patch.phone?.trim() || null;
+  if (typeof patch.notifyEmail === "boolean") u.notifyEmail = patch.notifyEmail;
+  if (typeof patch.notifySms === "boolean") u.notifySms = patch.notifySms;
+  // Keep audit snapshots on pending approvals in sync with the person.
+  s.approvals.forEach((a) => {
+    if (a.userId === id && a.status === "pending") {
+      a.name = u.name;
+      a.role = u.role;
+    }
+  });
+  save();
+  return mapUser(u);
+}
+
+export function updateTeam(
+  id: number,
+  patch: { name?: string; memberIds?: number[]; password?: string | null }
+): Team | null {
+  const s = db();
+  const t = s.teams.find((x) => x.id === id);
+  if (!t) return null;
+  if (patch.name?.trim()) t.name = patch.name.trim();
+  if (Array.isArray(patch.memberIds)) {
+    t.memberIds = patch.memberIds.filter((uid) => s.users.some((u) => u.id === uid));
+  }
+  if (patch.password !== undefined) t.password = patch.password?.trim() || null;
+  save();
+  return { id: t.id, name: t.name, memberIds: t.memberIds, members: usersByIds(t.memberIds), password: t.password };
+}
+
+export function updateDecision(
+  id: string,
+  patch: Partial<
+    Pick<
+      StoredDecision,
+      "title" | "summary" | "reason" | "location" | "costImpact" | "scheduleImpact" | "origin" | "causedById" | "projectId"
+    >
+  >
+): Decision | null {
+  const s = db();
+  const d = s.decisions.find((x) => x.id === id);
+  if (!d) return null;
+  if (patch.title?.trim()) d.title = patch.title.trim();
+  if (patch.summary?.trim()) d.summary = patch.summary.trim();
+  if (patch.reason !== undefined) d.reason = patch.reason?.trim() ?? "";
+  if (patch.location !== undefined) d.location = patch.location?.trim() ?? "";
+  if (patch.costImpact !== undefined) d.costImpact = patch.costImpact?.trim() || null;
+  if (patch.scheduleImpact !== undefined) d.scheduleImpact = patch.scheduleImpact?.trim() || null;
+  if (patch.origin !== undefined) d.origin = patch.origin?.trim() || null;
+  if (patch.causedById !== undefined) {
+    d.causedById =
+      patch.causedById && s.decisions.some((x) => x.id === patch.causedById && x.id !== id)
+        ? patch.causedById
+        : null;
+    if (d.causedById) d.origin = null;
+  }
+  if (patch.projectId !== undefined) {
+    d.projectId = s.projects.some((p) => p.id === patch.projectId) ? patch.projectId : null;
+  }
+  save();
+  logEvent(id, "edited", "Folor Admin", "Fields changed: " + Object.keys(patch).join(", "));
+  return getDecision(id);
+}
+
+
+// ---------------------------------------------------------------------------
+// Authentication (workspace login)
+// ---------------------------------------------------------------------------
+
+export interface SessionInfo {
+  token: string;
+  email: string;
+  name: string;
+  isAdmin: boolean;
+}
+
+/**
+ * Login rules (turnkey, prototype-grade):
+ * - email "admin" (or any email) + the workspace admin password -> admin session
+ * - a person's email + any of their teams' passwords -> member session
+ */
+export function login(email: string, password: string): SessionInfo | null {
+  const s = db();
+  const e = email.trim().toLowerCase();
+  if (!e || !password) return null;
+
+  let name = "Workspace Admin";
+  let isAdmin = false;
+
+  if (password === s.settings.adminPassword) {
+    isAdmin = true;
+    const u = s.users.find((x) => x.email?.toLowerCase() === e);
+    if (u) name = u.name;
+  } else {
+    const u = s.users.find((x) => x.email?.toLowerCase() === e);
+    if (!u) return null;
+    const teamOk = s.teams.some(
+      (t) => t.password && t.password === password && t.memberIds.includes(u.id)
+    );
+    if (!teamOk) return null;
+    name = u.name;
+  }
+
+  const session: StoredSession = {
+    token: newToken(),
+    email: e,
+    name,
+    isAdmin,
+    createdAt: new Date().toISOString(),
+  };
+  s.sessions.push(session);
+  // Keep the session list tidy.
+  if (s.sessions.length > 200) s.sessions = s.sessions.slice(-100);
+  save();
+  return { token: session.token, email: session.email, name: session.name, isAdmin };
+}
+
+export function getSession(token: string | undefined | null): SessionInfo | null {
+  if (!token) return null;
+  const t = db().sessions.find((x) => x.token === token);
+  return t ? { token: t.token, email: t.email, name: t.name, isAdmin: t.isAdmin } : null;
+}
+
+export function logout(token: string | undefined | null): void {
+  if (!token) return;
+  const s = db();
+  s.sessions = s.sessions.filter((x) => x.token !== token);
+  save();
+}
+
+export function generatePassword(): string {
+  const words = ["steel", "brick", "crane", "level", "frame", "beam", "stone", "north", "field", "site"];
+  const w = words[crypto.randomBytes(1)[0] % words.length];
+  const n = (crypto.randomBytes(2).readUInt16BE(0) % 900) + 100;
+  return w + "-" + n + "-" + newToken().slice(0, 4);
 }

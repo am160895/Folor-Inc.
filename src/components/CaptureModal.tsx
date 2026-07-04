@@ -28,11 +28,21 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SectionLabel, evidenceIcon } from "@/components/shared";
 import { draftFromText, tidyText } from "@/lib/data";
-import type { User, Project, Decision, Evidence } from "@/lib/types";
+import type { User, Project, Decision, Evidence, Team, WorkspaceSettings } from "@/lib/types";
 
 type Mode = "speak" | "type" | "upload";
 type Stage = "input" | "drafting" | "draft" | "saving" | "recorded";
 type Involvement = "off" | "see" | "approve";
+
+export const ORIGINS = [
+  "Site visit",
+  "Meeting",
+  "Phone call",
+  "Shop drawings",
+  "Email",
+  "Client request",
+  "Site inspection",
+];
 
 const SAMPLE =
   "We agreed onsite to center the linear lights on the soffit instead of the ceiling grid because it looked cleaner. No cost impact.";
@@ -43,18 +53,24 @@ export function CaptureModal({
   users,
   projects,
   decisions,
+  teams,
+  settings,
   defaultProjectId,
   onClose,
   onRecorded,
+  onPeopleChanged,
 }: {
   open: boolean;
   mode: Mode;
   users: User[];
   projects: Project[];
   decisions: Decision[];
+  teams: Team[];
+  settings: WorkspaceSettings;
   defaultProjectId: number | "all";
   onClose: () => void;
   onRecorded: () => void;
+  onPeopleChanged: () => Promise<void>;
 }) {
   const [stage, setStage] = useState<Stage>("input");
   const [text, setText] = useState("");
@@ -71,12 +87,43 @@ export function CaptureModal({
   const [newProjectName, setNewProjectName] = useState("");
   const [involvement, setInvolvement] = useState<Record<number, Involvement>>({});
   const [causedById, setCausedById] = useState<string>("");
+  const [customOrigin, setCustomOrigin] = useState("");
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [tidied, setTidied] = useState(false);
 
   const [recorded, setRecorded] = useState<Decision | null>(null);
+
+  // Inline quick-add person
+  const [addingPerson, setAddingPerson] = useState(false);
+  const [npName, setNpName] = useState("");
+  const [npRole, setNpRole] = useState("Architect");
+  const [npEmail, setNpEmail] = useState("");
+  const [npSaving, setNpSaving] = useState(false);
+
+  async function quickAddPerson() {
+    if (!npName.trim()) return;
+    setNpSaving(true);
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: npName, role: npRole, email: npEmail, notifyEmail: true }),
+      });
+      const j = await res.json();
+      if (res.ok) {
+        await onPeopleChanged();
+        // The person you add mid-capture is almost always the approver.
+        setInvolvement((prev) => ({ ...prev, [j.user.id]: "approve" }));
+        setNpName("");
+        setNpEmail("");
+        setAddingPerson(false);
+      }
+    } finally {
+      setNpSaving(false);
+    }
+  }
 
   // ---- Voice input (Web Speech API) ----------------------------------------
   const [listening, setListening] = useState(false);
@@ -132,6 +179,7 @@ export function CaptureModal({
       setEvidence([]);
       setTidied(false);
       setCausedById("");
+      setCustomOrigin("");
       setProjectId(defaultProjectId === "all" ? "" : defaultProjectId);
       setNewProjectName("");
       setInvolvement({});
@@ -154,17 +202,19 @@ export function CaptureModal({
       setSummary(d.decision);
       setReason(d.reason);
       setLocation(d.location);
-      setCostImpact(d.costImpact ?? "");
+      setCostImpact(d.costImpact ? d.costImpact.replace(/[^0-9.]/g, "") : "");
       setScheduleImpact(d.scheduleImpact ?? "");
 
       // Default involvement: mentioned people must approve; the rest of the
       // project team can see it.
       const inv: Record<number, Involvement> = {};
-      const proj =
-        typeof projectId === "number" ? projects.find((p) => p.id === projectId) : undefined;
-      proj?.members.forEach((m) => {
-        if (m.id) inv[m.id] = "see";
-      });
+      if (settings.defaultVisibility === "team") {
+        const proj =
+          typeof projectId === "number" ? projects.find((p) => p.id === projectId) : undefined;
+        proj?.members.forEach((m) => {
+          if (m.id) inv[m.id] = "see";
+        });
+      }
       d.matchedUserIds.forEach((id) => (inv[id] = "approve"));
       setInvolvement(inv);
       setStage("draft");
@@ -199,9 +249,18 @@ export function CaptureModal({
   }
 
   async function record() {
+    if (settings.requireReason && !reason.trim()) {
+      setError("Your workspace requires a reason (the Why field) on every decision.");
+      return;
+    }
     setStage("saving");
     setError(null);
     try {
+      const costNumber = parseFloat(costImpact.replace(/[^0-9.]/g, ""));
+      const formattedCost =
+        costImpact && !Number.isNaN(costNumber) && costNumber > 0
+          ? "+" + settings.currency + costNumber.toLocaleString()
+          : null;
       const watcherIds = Object.entries(involvement)
         .filter(([, v]) => v === "see")
         .map(([k]) => parseInt(k, 10));
@@ -219,11 +278,17 @@ export function CaptureModal({
           location,
           projectId: typeof projectId === "number" ? projectId : null,
           newProjectName: projectId === "new" ? newProjectName : undefined,
-          costImpact: costImpact || null,
+          costImpact: formattedCost,
           scheduleImpact: scheduleImpact || null,
           watcherIds,
           approverIds,
-          causedById: causedById || null,
+          causedById: causedById.startsWith("id:") ? causedById.slice(3) : null,
+          origin:
+            causedById === "custom"
+              ? customOrigin.trim() || null
+              : causedById && !causedById.startsWith("id:")
+                ? causedById
+                : null,
           evidence,
         }),
       });
@@ -380,11 +445,21 @@ export function CaptureModal({
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <DraftField label="Cost impact" icon={<DollarSign className="h-3.5 w-3.5" />}>
-                    <Input
-                      value={costImpact}
-                      onChange={(e) => setCostImpact(e.target.value)}
-                      placeholder="Leave empty for none"
-                    />
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                        {settings.currency}
+                      </span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        inputMode="decimal"
+                        value={costImpact}
+                        onChange={(e) => setCostImpact(e.target.value)}
+                        placeholder="0 = no cost impact"
+                        className="pl-7"
+                      />
+                    </div>
                   </DraftField>
                   <DraftField label="Schedule impact" icon={<CalendarClock className="h-3.5 w-3.5" />}>
                     <Input
@@ -434,23 +509,113 @@ export function CaptureModal({
                     <select
                       value={causedById}
                       onChange={(e) => setCausedById(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-border bg-white/[0.02] px-3 text-sm text-foreground outline-none focus:border-primary/50 [&>option]:bg-elevated"
+                      className="h-10 w-full rounded-lg border border-border bg-white/[0.02] px-3 text-sm text-foreground outline-none focus:border-primary/50 [&>option]:bg-elevated [&>optgroup]:bg-elevated"
                     >
-                      <option value="">Not linked to an earlier decision</option>
-                      {projectDecisions.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.id} — {d.title.slice(0, 40)}
-                        </option>
-                      ))}
+                      <option value="">—</option>
+                      <optgroup label="How it came about">
+                        {ORIGINS.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                        <option value="custom">Custom…</option>
+                      </optgroup>
+                      {projectDecisions.length > 0 && (
+                        <optgroup label="An earlier decision">
+                          {projectDecisions.map((d) => (
+                            <option key={d.id} value={"id:" + d.id}>
+                              {d.id} — {d.title.slice(0, 36)}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
+                    {causedById === "custom" && (
+                      <Input
+                        autoFocus
+                        className="mt-2"
+                        value={customOrigin}
+                        onChange={(e) => setCustomOrigin(e.target.value)}
+                        placeholder="e.g. Toolbox talk, Owner walkthrough"
+                      />
+                    )}
                   </DraftField>
                 </div>
 
                 {/* People: tap to cycle Off -> Can see -> Must approve */}
                 <DraftField label="People on this decision" icon={<Users className="h-3.5 w-3.5" />}>
+                  {teams.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {teams.map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() =>
+                            setInvolvement((prev) => {
+                              const next = { ...prev };
+                              const states = t.memberIds.map((id) => next[id] ?? "off");
+                              const target: Involvement = states.every((v) => v === "approve")
+                                ? "off"
+                                : states.every((v) => v === "see")
+                                  ? "approve"
+                                  : "see";
+                              t.memberIds.forEach((id) => (next[id] = target));
+                              return next;
+                            })
+                          }
+                          className="rounded-full border border-border/70 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-foreground/90 transition-colors hover:border-primary/40"
+                          title="Tap to set the whole team: Can see → Must approve → Off"
+                        >
+                          {t.name} · {t.memberIds.length}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {addingPerson ? (
+                    <div className="mb-2 grid gap-2 rounded-xl border border-primary/30 bg-primary/[0.05] p-3">
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Input
+                          autoFocus
+                          placeholder="Full name"
+                          value={npName}
+                          onChange={(e) => setNpName(e.target.value)}
+                        />
+                        <select
+                          value={npRole}
+                          onChange={(e) => setNpRole(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border bg-white/[0.02] px-3 text-sm text-foreground outline-none focus:border-primary/50 [&>option]:bg-elevated"
+                        >
+                          {["Architect", "Client", "Owner", "Superintendent", "Project Manager", "Engineer", "Electrical", "Subcontractor", "Team member"].map((r) => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <Input
+                        placeholder="Email (so they get the approval request)"
+                        type="email"
+                        value={npEmail}
+                        onChange={(e) => setNpEmail(e.target.value)}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => setAddingPerson(false)}>
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={quickAddPerson} disabled={npSaving || !npName.trim()}>
+                          {npSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                          Add &amp; set as approver
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setAddingPerson(true)}
+                      className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border/80 px-3 py-2.5 text-sm text-primary transition-colors hover:border-primary/50"
+                    >
+                      + Add a new person
+                    </button>
+                  )}
                   {users.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      No people yet — add teammates on the People page first.
+                      No people yet — add your architect or client right here with the button above.
                     </p>
                   ) : (
                     <>

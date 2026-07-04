@@ -15,6 +15,7 @@ import {
 import { useState as useLocalState } from "react";
 import { Plus, Check } from "lucide-react";
 import { Sidebar, type ViewKey } from "@/components/Sidebar";
+import { LedgerMark } from "@/components/shared";
 import { DecisionsView } from "@/components/views/DecisionsView";
 import { SearchView } from "@/components/views/SearchView";
 import { GraphView } from "@/components/views/GraphView";
@@ -23,6 +24,7 @@ import { DigestView } from "@/components/views/DigestView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { DecisionDetails } from "@/components/DecisionDetails";
 import { CaptureModal } from "@/components/CaptureModal";
+import { LoginScreen } from "@/components/LoginScreen";
 import type { Bootstrap, Decision } from "@/lib/types";
 
 type CaptureMode = "speak" | "type" | "upload";
@@ -40,6 +42,7 @@ export function AppShell() {
   const [view, setView] = useState<ViewKey>("decisions");
   const [data, setData] = useState<Bootstrap | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editSignal, setEditSignal] = useState(0);
   const [projectFilter, setProjectFilter] = useState<number | "all">("all");
   const [mobileProjectOpen, setMobileProjectOpen] = useState(false);
   const [capture, setCapture] = useState<{ open: boolean; mode: CaptureMode }>({
@@ -47,9 +50,16 @@ export function AppShell() {
     mode: "type",
   });
 
+  const [needsLogin, setNeedsLogin] = useState(false);
+
   const refresh = useCallback(async () => {
     const res = await fetch("/api/bootstrap");
-    if (res.ok) setData(await res.json());
+    if (res.ok) {
+      setData(await res.json());
+      setNeedsLogin(false);
+    } else if (res.status === 401) {
+      setNeedsLogin(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -90,10 +100,14 @@ export function AppShell() {
     [data, selectedId]
   );
 
+  if (needsLogin) {
+    return <LoginScreen onSuccess={refresh} />;
+  }
+
   if (!data) {
     return (
       <div className="flex h-screen items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading DecisionGraph…
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading Ledger…
       </div>
     );
   }
@@ -114,17 +128,16 @@ export function AppShell() {
           selectedProjectId={projectFilter}
           onSelectProject={setProjectFilter}
           onCreateProject={createProject}
+          workspaceName={data.settings.workspaceName}
+          isAdmin={data.me.isAdmin}
         />
       </div>
 
       {/* Mobile top bar */}
       <div className="relative z-20 flex items-center justify-between border-b border-border/70 bg-surface/60 px-4 py-3 backdrop-blur md:hidden">
         <div className="flex items-center gap-2">
-          <span className="flex items-center rounded-md bg-white px-1.5 py-1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/folor-logo.png" alt="Folor" className="h-3 w-auto" />
-          </span>
-          <span className="text-sm font-semibold tracking-tight">DecisionGraph</span>
+          <LedgerMark size={24} />
+          <span className="text-sm font-semibold tracking-tight">Ledger</span>
         </div>
         <button
           onClick={() => setMobileProjectOpen((o) => !o)}
@@ -192,17 +205,29 @@ export function AppShell() {
                   onOpen={(d) => setSelectedId(d.id)}
                   onCapture={openCapture}
                   onCreateProject={createProject}
+                  onSelectProject={setProjectFilter}
                 />
               )}
               {view === "search" && (
                 <SearchView decisions={decisions} onOpen={(d) => setSelectedId(d.id)} />
               )}
-              {view === "graph" && <GraphView decisions={decisions} />}
-              {view === "people" && <PeopleView users={data.users} onChanged={refresh} />}
+              {view === "graph" && (
+                <GraphView
+                  decisions={decisions}
+                  projects={data.projects}
+                  projectFilter={projectFilter}
+                  onSelectProject={setProjectFilter}
+                  onEditDecision={(id) => {
+                    setSelectedId(id);
+                    setEditSignal((n) => n + 1);
+                  }}
+                />
+              )}
+              {view === "people" && <PeopleView users={data.users} teams={data.teams} onChanged={refresh} />}
               {view === "digest" && (
                 <DigestView decisions={decisions} onOpen={(d) => setSelectedId(d.id)} />
               )}
-              {view === "settings" && <SettingsView config={data.config} />}
+              {view === "settings" && <SettingsView config={data.config} settings={data.settings} teams={data.teams} onChanged={refresh} />}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -210,7 +235,7 @@ export function AppShell() {
 
       {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-around border-t border-border/70 bg-surface/90 backdrop-blur-xl md:hidden">
-        {MOBILE_NAV.map((item) => {
+        {MOBILE_NAV.filter((item) => data.me.isAdmin || (item.key !== "people" && item.key !== "settings")).map((item) => {
           const Icon = item.icon;
           const isActive = view === item.key;
           return (
@@ -233,6 +258,7 @@ export function AppShell() {
         onClose={() => setSelectedId(null)}
         onOpenById={(id) => setSelectedId(id)}
         onChanged={refresh}
+        editSignal={editSignal}
       />
 
       <CaptureModal
@@ -241,9 +267,12 @@ export function AppShell() {
         users={data.users}
         projects={data.projects}
         decisions={data.decisions}
+        teams={data.teams}
+        settings={data.settings}
         defaultProjectId={projectFilter}
         onClose={() => setCapture((c) => ({ ...c, open: false }))}
         onRecorded={refresh}
+        onPeopleChanged={refresh}
       />
     </div>
   );

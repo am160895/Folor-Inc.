@@ -18,9 +18,15 @@ import {
   ArrowRight,
   UploadCloud,
   Loader2,
+  Pencil,
+  Check,
+  FileCheck2,
+  ScrollText,
 } from "lucide-react";
 import type { Decision } from "@/lib/types";
+import { DecisionFlow } from "@/components/DecisionFlow";
 import { Button } from "@/components/ui/button";
+import { Input, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   StatusPill,
@@ -35,19 +41,80 @@ export function DecisionDetails({
   onClose,
   onOpenById,
   onChanged,
+  editSignal,
 }: {
   decision: Decision | null;
   onClose: () => void;
   onOpenById?: (id: string) => void;
   onChanged?: () => void;
+  /** Increment to open the editor programmatically (e.g. from a graph node). */
+  editSignal?: number;
 }) {
   const [explaining, setExplaining] = useState(false);
   const [explained, setExplained] = useState(false);
+  const [tab, setTab] = useState<"details" | "graph" | "audit">("details");
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    title: "",
+    summary: "",
+    reason: "",
+    location: "",
+    costImpact: "",
+    scheduleImpact: "",
+    origin: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  function startEdit() {
+    if (!decision) return;
+    setForm({
+      title: decision.title,
+      summary: decision.summary,
+      reason: decision.reason,
+      location: decision.location,
+      costImpact: decision.costImpact ?? "",
+      scheduleImpact: decision.scheduleImpact ?? "",
+      origin: decision.origin ?? "",
+    });
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!decision) return;
+    setSavingEdit(true);
+    await fetch(`/api/decisions/${decision.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: form.title,
+        summary: form.summary,
+        reason: form.reason,
+        location: form.location,
+        costImpact: form.costImpact || null,
+        scheduleImpact: form.scheduleImpact || null,
+        origin: form.origin || null,
+      }),
+    });
+    setSavingEdit(false);
+    setEditing(false);
+    onChanged?.();
+  }
 
   useEffect(() => {
     setExplained(false);
     setExplaining(false);
+    setTab("details");
+    setEditing(false);
   }, [decision?.id]);
+
+  // Open the editor when asked from outside (graph node click).
+  useEffect(() => {
+    if (editSignal && decision) {
+      setTab("details");
+      startEdit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editSignal]);
 
   useEffect(() => {
     if (!decision) return;
@@ -99,16 +166,154 @@ export function DecisionDetails({
                   {decision.projectName}
                 </div>
               </div>
-              <button
-                onClick={onClose}
-                className="shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  onClick={() => (editing ? setEditing(false) : startEdit())}
+                  title={editing ? "Cancel editing" : "Edit this decision"}
+                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={onClose}
+                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </div>
 
+            {/* Tabs */}
+            <div className="flex gap-1 border-b border-border/60 px-6 pt-3">
+              {(["details", "graph", "audit"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${
+                    tab === t
+                      ? "border-b-2 border-primary text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t === "details" ? "Details" : t === "graph" ? "Graph" : `Audit (${decision.events.length})`}
+                </button>
+              ))}
+            </div>
+
+            {tab === "audit" && (
+              <div className="flex-1 overflow-y-auto p-6">
+                <p className="mb-4 text-xs text-muted-foreground">
+                  Append-only audit log — every event is recorded permanently and can never be
+                  edited or deleted.
+                </p>
+                <div>
+                  {decision.events.map((ev, i) => (
+                    <div key={ev.id} className="relative flex gap-3 pb-5">
+                      {i < decision.events.length - 1 && (
+                        <span className="absolute left-[7px] top-4 h-full w-px bg-border" />
+                      )}
+                      <span
+                        className={`relative mt-1 h-[15px] w-[15px] shrink-0 rounded-full border-2 ${
+                          ev.type === "acknowledged"
+                            ? "border-emerald-400 bg-emerald-400/20"
+                            : ev.type === "declined"
+                              ? "border-red-400 bg-red-400/20"
+                              : ev.type === "created"
+                                ? "border-primary bg-primary/20"
+                                : "border-border bg-elevated"
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <div className="text-sm">
+                          <span className="font-semibold uppercase tracking-wide text-foreground">
+                            {ev.type.replace("_", " ")}
+                          </span>
+                          <span className="text-muted-foreground"> · {ev.actor}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(ev.at).toLocaleString("en-US", {
+                            month: "short", day: "numeric", year: "numeric",
+                            hour: "numeric", minute: "2-digit", second: "2-digit",
+                          })}
+                        </div>
+                        {ev.detail && (
+                          <div className="mt-0.5 text-xs text-foreground/70">{ev.detail}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {tab === "graph" && (
+              <div className="min-h-0 flex-1">
+                <DecisionFlow
+                  decision={decision}
+                  onNavigate={(id) => onOpenById?.(id)}
+                  onEdit={() => {
+                    setTab("details");
+                    startEdit();
+                  }}
+                />
+              </div>
+            )}
+
             {/* Body */}
-            <div className="flex-1 space-y-7 overflow-y-auto p-6">
+            <div className={`flex-1 space-y-7 overflow-y-auto p-6 ${tab === "graph" ? "hidden" : ""}`}>
+              {editing && (
+                <div className="space-y-3 rounded-2xl border border-primary/30 bg-primary/[0.05] p-4">
+                  <Field label="Title">
+                    <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                  </Field>
+                  <Field label="Decision">
+                    <Textarea
+                      value={form.summary}
+                      onChange={(e) => setForm({ ...form, summary: e.target.value })}
+                      className="min-h-[72px]"
+                    />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Why">
+                      <Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+                    </Field>
+                    <Field label="Location">
+                      <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+                    </Field>
+                    <Field label="Cost impact">
+                      <Input
+                        value={form.costImpact}
+                        onChange={(e) => setForm({ ...form, costImpact: e.target.value })}
+                        placeholder="e.g. +$2,500"
+                      />
+                    </Field>
+                    <Field label="Schedule impact">
+                      <Input
+                        value={form.scheduleImpact}
+                        onChange={(e) => setForm({ ...form, scheduleImpact: e.target.value })}
+                        placeholder="e.g. +2 days"
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Caused by (origin)">
+                    <Input
+                      value={form.origin}
+                      onChange={(e) => setForm({ ...form, origin: e.target.value })}
+                      placeholder="e.g. Site visit, Phone call"
+                    />
+                  </Field>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={saveEdit} disabled={savingEdit || !form.title.trim()}>
+                      {savingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                      Save changes
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <Field label="Decision">
                 <p className="text-[15px] leading-relaxed text-foreground/90">
                   {decision.summary}
@@ -158,9 +363,15 @@ export function DecisionDetails({
                 <ImpactPill decision={decision} />
               </Field>
 
-              {(decision.causedBy || decision.ledTo.length > 0) && (
+              {(decision.causedBy || decision.origin || decision.ledTo.length > 0) && (
                 <Field label="Decision chain">
                   <div className="flex flex-wrap items-center gap-2">
+                    {decision.origin && !decision.causedBy && (
+                      <span className="flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/[0.08] px-3 py-1.5 text-xs text-amber-200">
+                        <GitBranch className="h-3 w-3" />
+                        Came from: {decision.origin}
+                      </span>
+                    )}
                     {decision.causedBy && (
                       <button
                         onClick={() => onOpenById?.(decision.causedBy!.id)}
@@ -260,20 +471,39 @@ export function DecisionDetails({
                         <span className="text-muted-foreground">· {a.role}</span>
                       </span>
                       {a.status === "pending" ? (
-                        <a
-                          href={`/approve/${a.token}`}
-                          target="_blank"
-                          className="flex shrink-0 items-center gap-1 text-xs text-primary hover:underline"
-                        >
-                          <ExternalLink className="h-3 w-3" /> Approval link
-                        </a>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <a
+                            href={`/email/${a.token}`}
+                            target="_blank"
+                            className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+                            title="Preview the email this person receives"
+                          >
+                            Email
+                          </a>
+                          <span
+                            className={`text-[11px] ${
+                              a.viewedAt ? "text-sky-300" : "text-muted-foreground/70"
+                            }`}
+                            title={a.viewedAt ? "Opened their approval link" : "Has not opened the link yet"}
+                          >
+                            {a.viewedAt ? "Seen ✓" : "Not seen"}
+                          </span>
+                          <a
+                            href={`/approve/${a.token}`}
+                            target="_blank"
+                            className="flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            <ExternalLink className="h-3 w-3" /> Link
+                          </a>
+                        </span>
                       ) : (
                         <span
                           className={`shrink-0 text-xs ${
                             a.status === "approved" ? "text-emerald-300" : "text-red-300"
                           }`}
                         >
-                          {a.status === "approved" ? "Approved" : "Declined"}
+                          {a.status === "approved" ? "Acknowledged" : "Declined"}
+                          {a.ip ? ` · ${a.device ?? "?"} · ${a.ip}` : ""}
                         </span>
                       )}
                     </div>
@@ -341,6 +571,22 @@ export function DecisionDetails({
                   </div>
                 </Field>
               )}
+
+              {/* Generate Evidence */}
+              <div className="grid grid-cols-2 gap-2">
+                <Button asChild className="w-full">
+                  <a href={`/evidence/${decision.id}`} target="_blank">
+                    <FileCheck2 className="h-4 w-4" />
+                    Generate Evidence
+                  </a>
+                </Button>
+                <Button asChild variant="secondary" className="w-full">
+                  <a href={`/certificate/${decision.id}`} target="_blank">
+                    <ScrollText className="h-4 w-4" />
+                    Audit certificate
+                  </a>
+                </Button>
+              </div>
 
               {/* Explain this decision */}
               <div>

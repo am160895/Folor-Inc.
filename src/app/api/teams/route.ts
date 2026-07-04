@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sessionOf, unauthorized, forbidden } from "@/lib/auth";
-import { createProject, listProjects } from "@/lib/db";
+import { createTeam, listTeams } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   if (!sessionOf(req)) return unauthorized();
-  return NextResponse.json({ projects: listProjects() });
+  return NextResponse.json({ teams: listTeams() });
 }
 
 export async function POST(req: NextRequest) {
@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
   if (!sessionOf(req)!.isAdmin) return forbidden();
   const body = await req.json();
   if (!body?.name?.trim()) {
-    return NextResponse.json({ error: "Project name is required." }, { status: 400 });
+    return NextResponse.json({ error: "Team name is required." }, { status: 400 });
   }
-  const project = createProject(body.name);
-  return NextResponse.json({ project }, { status: 201 });
+  const team = createTeam(body.name, Array.isArray(body.memberIds) ? body.memberIds : []);
+  return NextResponse.json({ team }, { status: 201 });
 }

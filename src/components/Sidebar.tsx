@@ -13,10 +13,11 @@ import {
   Plus,
   Check,
   ChevronsUpDown,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CURRENT_USER } from "@/lib/data";
+import { LedgerMark } from "@/components/shared";
 import type { Project } from "@/lib/types";
 
 export type ViewKey = "decisions" | "search" | "graph" | "people" | "digest" | "settings";
@@ -37,6 +38,8 @@ export function Sidebar({
   selectedProjectId,
   onSelectProject,
   onCreateProject,
+  workspaceName,
+  isAdmin,
 }: {
   active: ViewKey;
   onNavigate: (v: ViewKey) => void;
@@ -44,6 +47,8 @@ export function Sidebar({
   selectedProjectId: number | "all";
   onSelectProject: (id: number | "all") => void;
   onCreateProject: (name: string) => Promise<void>;
+  workspaceName: string;
+  isAdmin: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -66,12 +71,12 @@ export function Sidebar({
     <aside className="relative z-10 flex w-[248px] shrink-0 flex-col border-r border-border/70 bg-surface/40 px-3.5 py-5">
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-2.5 pb-4">
-        <span className="flex items-center rounded-lg bg-white px-2 py-1.5 shadow">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/folor-logo.png" alt="Folor" className="h-4 w-auto" />
-        </span>
+        <LedgerMark size={32} />
         <div className="leading-tight">
-          <div className="text-sm font-semibold tracking-tight">DecisionGraph</div>
+          <div className="text-[17px] font-semibold tracking-tight">Ledger</div>
+          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
+            Every decision. Recorded.
+          </div>
         </div>
       </div>
 
@@ -161,7 +166,7 @@ export function Sidebar({
 
       {/* Nav */}
       <nav className="flex flex-col gap-1">
-        {NAV.map((item) => {
+        {NAV.filter((item) => isAdmin || (item.key !== "people" && item.key !== "settings")).map((item) => {
           const isActive = active === item.key;
           const Icon = item.icon;
           return (
@@ -197,15 +202,24 @@ export function Sidebar({
       <div className="mt-auto">
         <div className="rounded-xl border border-border/70 bg-white/[0.02] p-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary/40 to-primary/10 text-xs font-semibold">
-              {CURRENT_USER.initials}
+            <span className="flex shrink-0 items-center rounded-md bg-white px-1.5 py-1 shadow">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/folor-logo.png" alt="Folor" className="h-3 w-auto" />
+            </span>
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="truncate text-xs font-medium">{workspaceName}</div>
+              <div className="truncate text-[11px] text-muted-foreground">Workspace admin</div>
             </div>
-            <div className="min-w-0 leading-tight">
-              <div className="truncate text-xs font-medium">{CURRENT_USER.name}</div>
-              <div className="truncate text-[11px] text-muted-foreground">
-                {CURRENT_USER.company}
-              </div>
-            </div>
+            <button
+              onClick={async () => {
+                await fetch("/api/auth/logout", { method: "POST" });
+                window.location.reload();
+              }}
+              title="Sign out"
+              className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </div>

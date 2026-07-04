@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, X, MapPin, Calendar, Users, Loader2, ShieldCheck } from "lucide-react";
+import { LedgerMark } from "@/components/shared";
 
 interface ApprovalData {
   approverName: string;
   approverRole: string;
   status: "pending" | "approved" | "declined";
+  consentText: string;
+  buttonText: string;
   decision: {
     id: string;
     title: string;
@@ -29,6 +32,9 @@ export default function ApprovePage({ params }: { params: { token: string } }) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<"approved" | "declined" | null>(null);
+  const [role, setRole] = useState("");
+  const [company, setCompany] = useState("");
+  const ROLES = ["Owner", "Architect", "Engineer", "GC", "Subcontractor", "Consultant", "Other"];
 
   useEffect(() => {
     fetch(`/api/approvals/${params.token}`)
@@ -36,6 +42,10 @@ export default function ApprovePage({ params }: { params: { token: string } }) {
         const j = await r.json();
         if (!r.ok) throw new Error(j.error ?? "Something went wrong.");
         setData(j);
+        const match = ["Owner","Architect","Engineer","GC","Subcontractor","Consultant"].find(
+          (r) => j.approverRole?.toLowerCase().includes(r.toLowerCase())
+        );
+        setRole(match ?? "Other");
         if (j.status !== "pending") setDone(j.status);
       })
       .catch((e) => setError(e.message));
@@ -46,7 +56,7 @@ export default function ApprovePage({ params }: { params: { token: string } }) {
     const r = await fetch(`/api/approvals/${params.token}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, role, company }),
     });
     setSubmitting(false);
     if (r.ok) setDone(action);
@@ -57,11 +67,12 @@ export default function ApprovePage({ params }: { params: { token: string } }) {
       <div className="w-full max-w-md">
         {/* Brand */}
         <div className="mb-6 flex items-center justify-center gap-2.5">
-          <span className="rounded-lg bg-white px-2.5 py-1.5">
+          <LedgerMark size={28} />
+          <span className="text-base font-semibold text-foreground">Ledger</span>
+          <span className="rounded-md bg-white px-1.5 py-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/folor-logo.png" alt="Folor" className="h-4 w-auto" />
+            <img src="/folor-logo.png" alt="Folor" className="h-3 w-auto" />
           </span>
-          <span className="text-sm font-medium text-muted-foreground">DecisionGraph</span>
         </div>
 
         {error && (
@@ -119,25 +130,61 @@ export default function ApprovePage({ params }: { params: { token: string } }) {
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
-                disabled={submitting}
-                onClick={() => respond("declined")}
-                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-white/[0.03] px-4 py-3.5 text-sm font-semibold text-foreground transition-colors hover:border-red-400/40 hover:bg-red-500/10 disabled:opacity-50"
-              >
-                <X className="h-4 w-4" /> Decline
-              </button>
+            {/* Signer identity confirmation */}
+            <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <div>
+                <div className="mb-1 text-[11px] uppercase tracking-wider text-muted-foreground/70">
+                  I am signing as
+                </div>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-border bg-white/[0.02] px-3 text-sm text-foreground outline-none focus:border-primary/50 [&>option]:bg-elevated"
+                >
+                  {ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <div className="mb-1 text-[11px] uppercase tracking-wider text-muted-foreground/70">
+                  Company (optional)
+                </div>
+                <input
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="Your company"
+                  className="h-11 w-full rounded-xl border border-border bg-white/[0.02] px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-primary/50"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-2.5">
               <button
                 disabled={submitting}
                 onClick={() => respond("approved")}
-                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3.5 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(16,185,129,0.7)] transition-transform hover:scale-[1.02] disabled:opacity-50"
+                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(16,185,129,0.7)] transition-transform hover:scale-[1.01] disabled:opacity-50"
               >
-                <Check className="h-4 w-4" strokeWidth={3} /> Approve
+                <Check className="h-5 w-5" strokeWidth={3} />
+                {data.buttonText}
+              </button>
+              <button
+                disabled={submitting}
+                onClick={() => respond("declined")}
+                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-white/[0.03] px-4 py-3 text-sm font-medium text-foreground transition-colors hover:border-red-400/40 hover:bg-red-500/10 disabled:opacity-50"
+              >
+                <X className="h-4 w-4" /> This does not accurately reflect the decision
               </button>
             </div>
 
-            <p className="mt-4 text-center text-[11px] text-muted-foreground/70">
-              Your response is recorded permanently with the decision.
+            <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground/80">
+              {data.consentText}
+            </p>
+            <p className="mt-2 text-center text-[10px] text-muted-foreground/60">
+              Ledger creates contemporaneous evidence trails that help teams reconstruct, support,
+              and explain decisions. It does not replace signed change orders.
             </p>
           </motion.div>
         )}

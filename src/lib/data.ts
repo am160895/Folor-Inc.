@@ -118,14 +118,7 @@ export function draftFromText(text: string, users: User[]): Draft {
     })
     .map((u) => u.id);
 
-  // Title: first sentence, stripped of agreement boilerplate.
-  let title = clean.split(/(?<=[.!?])\s/)[0].replace(/[.!?]$/, "");
-  title = title
-    .replace(/^.*?\b(?:agreed|decided|confirmed)\b\s*(?:onsite\s*)?(?:to\s*)?/i, "")
-    .trim();
-  if (title.length === 0) title = clean.slice(0, 70);
-  title = title[0].toUpperCase() + title.slice(1);
-  if (title.length > 72) title = title.slice(0, 69).trimEnd() + "…";
+  const title = makeTitle(clean);
 
   // Location: "at/in/on the <place>"
   const loc = clean.match(/\b(?:at|in|on)\s+the\s+([A-Za-z][\w\s-]{2,28}?)(?=[,.]|$| instead| rather)/i);
@@ -173,13 +166,34 @@ export function tidyText(input: string, opts?: { title?: boolean }): string {
   if (!t) return input.trim();
   t = t[0].toUpperCase() + t.slice(1);
   if (opts?.title) {
-    t = t.replace(/[.!?]+$/, "");
-    if (t.length > 64) {
-      const cut = t.slice(0, 64);
-      t = cut.slice(0, Math.max(cut.lastIndexOf(" "), 40)).trimEnd();
-    }
+    return makeTitle(t);
   } else if (!/[.!?]$/.test(t)) {
     t += ".";
   }
+  return t;
+}
+
+
+/**
+ * Compress a decision statement into a short, headline-style title:
+ * "Replace the new water filter with a tap" -> "Replace water filter with tap".
+ * Strips boilerplate, the reason clause, and articles; caps at 8 words.
+ */
+export function makeTitle(text: string): string {
+  let t = text.trim().replace(/\s+/g, " ");
+  // First sentence only, and drop any trailing reason clause.
+  t = t.split(/(?<=[.!?])\s/)[0].replace(/[.!?]$/, "");
+  t = t.replace(/\b(?:because|since|as|so that|due to)\b.*$/i, "");
+  // Strip agreement boilerplate and names before the verb.
+  t = t.replace(/^.*?\b(?:agreed|decided|confirmed|want(?:s)? to|going to|gonna)\b\s*(?:onsite\s*)?(?:to\s*)?/i, "");
+  t = t.replace(/^(?:we|they|i)\s+(?:will|would|should|need to|are going to)\s*/i, "");
+  // Drop articles and softeners to compress.
+  t = t.replace(/\b(the|a|an|just|really|new)\b\s*/gi, "");
+  t = t.replace(/\s{2,}/g, " ").replace(/\s+([,.])/g, "$1").trim().replace(/[,.]$/, "");
+  if (!t) t = text.trim().slice(0, 60);
+  // Cap at 8 words.
+  const words = t.split(" ");
+  if (words.length > 8) t = words.slice(0, 8).join(" ");
+  t = t[0].toUpperCase() + t.slice(1);
   return t;
 }

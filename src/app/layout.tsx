@@ -15,9 +15,15 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Folor DecisionGraph — Every decision, traceable",
+  title: "Ledger — Every decision. Recorded. Every decision. Protected.",
   description:
-    "Folor DecisionGraph captures important project decisions and shows who decided, why, when, and what evidence supports it.",
+    "Ledger captures important project decisions and shows who decided, why, when, and what evidence supports it.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Ledger",
+  },
 };
 
 export const viewport = {

@@ -115,3 +115,23 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+
+/** Ledger logomark: three bars with a folded page corner, purple gradient. */
+export function LedgerMark({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-label="Ledger">
+      <defs>
+        <linearGradient id="lg-grad" x1="0" y1="0" x2="32" y2="32">
+          <stop offset="0%" stopColor="#a78bfa" />
+          <stop offset="100%" stopColor="#6d4aff" />
+        </linearGradient>
+      </defs>
+      <rect x="1" y="1" width="30" height="30" rx="8" fill="url(#lg-grad)" />
+      <rect x="7" y="8" width="18" height="3.4" rx="1.7" fill="white" />
+      <rect x="7" y="14.3" width="18" height="3.4" rx="1.7" fill="white" />
+      <rect x="7" y="20.6" width="12.5" height="3.4" rx="1.7" fill="white" />
+      <path d="M25 20.6 L25 24 L21.5 24 Z" fill="white" opacity="0.85" />
+    </svg>
+  );
+}
