@@ -184,7 +184,12 @@ function approvalEmailHtml(decision: Decision, link: string): string {
     '<p style="font-size:13px;color:#666;margin:0 0 16px">Folor · Ledger</p>' +
     '<h2 style="margin:0 0 8px;font-size:20px">A decision needs your acknowledgement</h2>' +
     decisionCardHtml(decision) +
-    '<a href="' + link + '" style="display:inline-block;background:#6d4aff;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600">Review &amp; acknowledge</a>' +
+    '<table role="presentation" cellpadding="0" cellspacing="0"><tr>' +
+    '<td><a href="' + link + '" style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;padding:13px 24px;border-radius:10px;font-weight:600">&#10003;&nbsp; Acknowledge</a></td>' +
+    '<td style="width:12px"></td>' +
+    '<td><a href="' + link + '?intent=decline" style="display:inline-block;background:#fff;color:#b91c1c;border:1px solid #fca5a5;text-decoration:none;padding:12px 24px;border-radius:10px;font-weight:600">&#10007;&nbsp; Decline</a></td>' +
+    '</tr></table>' +
+    '<p style="font-size:12px;color:#888;margin:14px 0 0">One tap — you&#39;ll confirm on the next screen.</p>' +
     '<p style="font-size:11px;color:#999;margin-top:20px;line-height:1.5">' + CONSENT_TEXT + '</p>' +
     '<p style="font-size:11px;color:#bbb;margin-top:8px">This link is unique to you.</p>' +
     "</div>"

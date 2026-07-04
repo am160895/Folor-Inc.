@@ -34,7 +34,14 @@ export default function ApprovePage({ params }: { params: { token: string } }) {
   const [done, setDone] = useState<"approved" | "declined" | null>(null);
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");
+  const [intent, setIntent] = useState<"approve" | "decline">("approve");
   const ROLES = ["Owner", "Architect", "Engineer", "GC", "Subcontractor", "Consultant", "Other"];
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("intent") === "decline") {
+      setIntent("decline");
+    }
+  }, []);
 
   useEffect(() => {
     fetch(`/api/approvals/${params.token}`)
@@ -173,7 +180,11 @@ export default function ApprovePage({ params }: { params: { token: string } }) {
               <button
                 disabled={submitting}
                 onClick={() => respond("declined")}
-                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-white/[0.03] px-4 py-3 text-sm font-medium text-foreground transition-colors hover:border-red-400/40 hover:bg-red-500/10 disabled:opacity-50"
+                className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium text-foreground transition-colors hover:border-red-400/40 hover:bg-red-500/10 disabled:opacity-50 ${
+                  intent === "decline"
+                    ? "border-red-400/50 bg-red-500/10"
+                    : "border-border bg-white/[0.03]"
+                }`}
               >
                 <X className="h-4 w-4" /> This does not accurately reflect the decision
               </button>

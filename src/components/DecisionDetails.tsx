@@ -22,6 +22,7 @@ import {
   Check,
   FileCheck2,
   ScrollText,
+  Trash2,
 } from "lucide-react";
 import type { Decision } from "@/lib/types";
 import { DecisionFlow } from "@/components/DecisionFlow";
@@ -42,6 +43,7 @@ export function DecisionDetails({
   onOpenById,
   onChanged,
   editSignal,
+  isAdmin,
 }: {
   decision: Decision | null;
   onClose: () => void;
@@ -49,6 +51,7 @@ export function DecisionDetails({
   onChanged?: () => void;
   /** Increment to open the editor programmatically (e.g. from a graph node). */
   editSignal?: number;
+  isAdmin?: boolean;
 }) {
   const [explaining, setExplaining] = useState(false);
   const [explained, setExplained] = useState(false);
@@ -167,13 +170,29 @@ export function DecisionDetails({
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <button
-                  onClick={() => (editing ? setEditing(false) : startEdit())}
-                  title={editing ? "Cancel editing" : "Edit this decision"}
-                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => (editing ? setEditing(false) : startEdit())}
+                    title={editing ? "Cancel editing" : "Edit this decision"}
+                    className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Delete "${decision.title}" and its records? This cannot be undone.`)) return;
+                      await fetch(`/api/decisions/${decision.id}`, { method: "DELETE" });
+                      onClose();
+                      onChanged?.();
+                    }}
+                    title="Delete this decision"
+                    className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
                 <button
                   onClick={onClose}
                   className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"

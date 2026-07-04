@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     notifyEmail: body.notifyEmail,
     notifySms: body.notifySms,
     teamId: typeof body.teamId === "number" ? body.teamId : null,
+    password: body.password,
   });
   return NextResponse.json({ user }, { status: 201 });
 }

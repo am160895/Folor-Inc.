@@ -44,12 +44,21 @@ export default function EmailPreviewPage({ params }: { params: { token: string }
                 {d.costImpact ?? "No cost impact"} · {d.scheduleImpact ?? "No schedule impact"}
               </p>
             </div>
-            <a
-              href={`/approve/${params.token}`}
-              className="mt-4 inline-block rounded-xl bg-[#6d4aff] px-5 py-3 text-sm font-semibold text-white"
-            >
-              Review &amp; acknowledge
-            </a>
+            <div className="mt-4 flex items-center gap-3">
+              <a
+                href={`/approve/${params.token}`}
+                className="inline-block rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white"
+              >
+                ✓&nbsp; Acknowledge
+              </a>
+              <a
+                href={`/approve/${params.token}?intent=decline`}
+                className="inline-block rounded-xl border border-red-300 bg-white px-5 py-3 text-sm font-semibold text-red-700"
+              >
+                ✗&nbsp; Decline
+              </a>
+            </div>
+            <p className="mt-3 text-xs text-neutral-500">One tap — you&apos;ll confirm on the next screen.</p>
             <p className="mt-4 text-[11px] leading-relaxed text-neutral-400">{data.consentText}</p>
           </div>
         </div>

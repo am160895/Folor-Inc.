@@ -14,6 +14,7 @@ import {
   Check,
   ChevronsUpDown,
   LogOut,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,24 @@ export function Sidebar({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pw, setPw] = useState("");
+  const [pwMsg, setPwMsg] = useState<string | null>(null);
+
+  async function savePw() {
+    if (pw.trim().length < 4) return;
+    const res = await fetch("/api/auth/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pw }),
+    });
+    if (res.ok) {
+      setPw("");
+      setPwOpen(false);
+    } else {
+      setPwMsg((await res.json()).error ?? "Could not save.");
+    }
+  }
 
   const selectedName =
     selectedProjectId === "all"
@@ -201,6 +220,29 @@ export function Sidebar({
 
       <div className="mt-auto">
         <div className="rounded-xl border border-border/70 bg-white/[0.02] p-3">
+          {pwOpen && (
+            <div className="mb-2.5 space-y-1.5">
+              <input
+                autoFocus
+                type="password"
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && savePw()}
+                placeholder="New personal password"
+                className="h-8 w-full rounded-lg border border-border bg-white/[0.03] px-2.5 text-xs outline-none placeholder:text-muted-foreground/60 focus:border-primary/50"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground">{pwMsg ?? "Sign in with your email + this."}</span>
+                <button
+                  onClick={savePw}
+                  disabled={pw.trim().length < 4}
+                  className="rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground disabled:opacity-40"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-2.5">
             <span className="flex shrink-0 items-center rounded-md bg-white px-1.5 py-1 shadow">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -210,6 +252,13 @@ export function Sidebar({
               <div className="truncate text-xs font-medium">{workspaceName}</div>
               <div className="truncate text-[11px] text-muted-foreground">Workspace admin</div>
             </div>
+            <button
+              onClick={() => { setPwOpen((o) => !o); setPwMsg(null); }}
+              title="Set my password"
+              className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+            </button>
             <button
               onClick={async () => {
                 await fetch("/api/auth/logout", { method: "POST" });

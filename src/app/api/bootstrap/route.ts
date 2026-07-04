@@ -8,13 +8,17 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const session = sessionOf(req);
   if (!session) return unauthorized();
+  // Passwords only travel to admin sessions.
+  const users = listUsers().map((u) => (session.isAdmin ? u : { ...u, password: null }));
+  const teams = listTeams().map((t) => (session.isAdmin ? t : { ...t, password: null }));
+  const settings = getSettings();
   return NextResponse.json({
     me: { name: session.name, email: session.email, isAdmin: session.isAdmin },
     decisions: listDecisions(),
-    users: listUsers(),
+    users,
     projects: listProjects(),
-    teams: listTeams(),
-    settings: getSettings(),
+    teams,
+    settings: session.isAdmin ? settings : { ...settings, adminPassword: "" },
     config: {
       emailConfigured: emailConfigured(),
       smsConfigured: smsConfigured(),

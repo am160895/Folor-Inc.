@@ -66,7 +66,7 @@ export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Team or admin password"
+                placeholder="Your password"
                 autoComplete="current-password"
               />
             </div>
@@ -77,9 +77,8 @@ export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
             Sign in
           </Button>
           <p className="mt-4 text-center text-[11px] leading-relaxed text-muted-foreground/70">
-            Team members sign in with their email and their team&apos;s password.
-            Admins use the workspace admin password (default: <code className="text-foreground/70">ledger123</code> —
-            change it in Settings).
+            Sign in with your email and the password you were given.
+            Forgot it? Ask your workspace admin.
           </p>
         </form>
       </motion.div>

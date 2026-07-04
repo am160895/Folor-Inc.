@@ -13,7 +13,7 @@ import {
   ChevronsUpDown,
 } from "lucide-react";
 import { useState as useLocalState } from "react";
-import { Plus, Check } from "lucide-react";
+import { Plus, Check, KeyRound, LogOut } from "lucide-react";
 import { Sidebar, type ViewKey } from "@/components/Sidebar";
 import { LedgerMark } from "@/components/shared";
 import { DecisionsView } from "@/components/views/DecisionsView";
@@ -139,13 +139,16 @@ export function AppShell() {
           <LedgerMark size={24} />
           <span className="text-sm font-semibold tracking-tight">Ledger</span>
         </div>
-        <button
-          onClick={() => setMobileProjectOpen((o) => !o)}
-          className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-white/[0.02] px-2.5 py-1.5 text-xs font-medium text-foreground"
-        >
-          <span className="max-w-[130px] truncate">{selectedProjectName}</span>
-          <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setMobileProjectOpen((o) => !o)}
+            className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-white/[0.02] px-2.5 py-1.5 text-xs font-medium text-foreground"
+          >
+            <span className="max-w-[110px] truncate">{selectedProjectName}</span>
+            <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+          <MobileAccount />
+        </div>
         <AnimatePresence>
           {mobileProjectOpen && (
             <motion.div
@@ -259,6 +262,7 @@ export function AppShell() {
         onOpenById={(id) => setSelectedId(id)}
         onChanged={refresh}
         editSignal={editSignal}
+        isAdmin={data.me.isAdmin}
       />
 
       <CaptureModal
@@ -308,6 +312,73 @@ function MobileNewProject({ onCreate }: { onCreate: (name: string) => Promise<vo
       >
         <Check className="h-4 w-4" />
       </button>
+    </div>
+  );
+}
+
+function MobileAccount() {
+  const [open, setOpen] = useLocalState(false);
+  const [pw, setPw] = useLocalState("");
+  const [msg, setMsg] = useLocalState<string | null>(null);
+
+  async function savePw() {
+    if (pw.trim().length < 4) return;
+    const res = await fetch("/api/auth/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pw }),
+    });
+    if (res.ok) {
+      setPw("");
+      setMsg("Saved — use it next sign-in.");
+    } else {
+      setMsg((await res.json()).error ?? "Could not save.");
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => { setOpen((o) => !o); setMsg(null); }}
+        title="Account"
+        className="rounded-lg border border-border/70 bg-white/[0.02] p-2 text-muted-foreground"
+      >
+        <KeyRound className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-40 mt-1.5 w-60 rounded-xl border border-border bg-elevated p-3 shadow-2xl">
+          <div className="mb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+            My password
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="password"
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && savePw()}
+              placeholder="New password"
+              className="h-8 w-full rounded-lg border border-border bg-white/[0.03] px-2.5 text-xs outline-none placeholder:text-muted-foreground/60 focus:border-primary/50"
+            />
+            <button
+              onClick={savePw}
+              disabled={pw.trim().length < 4}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+          </div>
+          {msg && <p className="mt-1.5 text-[10px] text-muted-foreground">{msg}</p>}
+          <button
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              window.location.reload();
+            }}
+            className="mt-2.5 flex w-full items-center gap-2 rounded-lg border border-border/70 px-2.5 py-2 text-xs font-medium text-muted-foreground"
+          >
+            <LogOut className="h-3.5 w-3.5" /> Sign out
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -110,7 +110,7 @@ export function PeopleView({
 
   // Inline editing of an existing person
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [edit, setEdit] = useState({ name: "", role: "", email: "", phone: "", notifyEmail: true, notifySms: false });
+  const [edit, setEdit] = useState({ name: "", role: "", email: "", phone: "", notifyEmail: true, notifySms: false, password: "" });
   const [savingEdit, setSavingEdit] = useState(false);
 
   function startEdit(u: User) {
@@ -122,6 +122,7 @@ export function PeopleView({
       phone: u.phone ?? "",
       notifyEmail: u.notifyEmail,
       notifySms: u.notifySms,
+      password: u.password ?? "",
     });
   }
 
@@ -443,6 +444,32 @@ export function PeopleView({
             <Input placeholder="Role (e.g. Architect)" value={edit.role} onChange={(e) => setEdit({ ...edit, role: e.target.value })} />
             <Input placeholder="Email" type="email" value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} />
             <Input placeholder="Mobile number" type="tel" value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} />
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Personal login password (optional)"
+              value={edit.password}
+              onChange={(e) => setEdit({ ...edit, password: e.target.value })}
+              className="max-w-xs font-mono text-xs"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setEdit({
+                  ...edit,
+                  password:
+                    ["steel", "brick", "crane", "level", "frame", "beam"][Math.floor(Math.random() * 6)] +
+                    "-" +
+                    (Math.floor(Math.random() * 900) + 100),
+                })
+              }
+            >
+              Generate
+            </Button>
+            <span className="text-[11px] text-muted-foreground">
+              They sign in with their email + this (or their team password).
+            </span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <NotifyToggle

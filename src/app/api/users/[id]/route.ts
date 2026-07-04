@@ -8,6 +8,8 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  if (!sessionOf(_req)) return unauthorized();
+  if (!sessionOf(_req)!.isAdmin) return forbidden();
   const id = parseInt(params.id, 10);
   if (Number.isNaN(id)) {
     return NextResponse.json({ error: "Invalid user id." }, { status: 400 });

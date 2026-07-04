@@ -27,6 +27,8 @@ export interface User {
   phone: string | null;
   notifyEmail: boolean;
   notifySms: boolean;
+  /** Personal login password — only sent to admin sessions. */
+  password: string | null;
   initials: string;
 }
 

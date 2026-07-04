@@ -30,6 +30,8 @@ interface StoredUser {
   phone: string | null;
   notifyEmail: boolean;
   notifySms: boolean;
+  /** Personal login password (optional — team password also works). */
+  password: string | null;
   createdAt: string;
 }
 
@@ -218,6 +220,9 @@ function normalize(s: Store): Store {
   s.teams.forEach((t: any) => {
     if (t.password === undefined) t.password = null;
   });
+  s.users.forEach((u: any) => {
+    if (u.password === undefined) u.password = null;
+  });
   if (!Array.isArray((s as any).sessions)) (s as any).sessions = [];
   if (!(s.nextIds as any).team) (s.nextIds as any).team = 1;
   s.settings = { ...DEFAULT_SETTINGS, ...(s.settings ?? {}) };
@@ -301,6 +306,7 @@ function mapUser(u: StoredUser): User {
     phone: u.phone,
     notifyEmail: u.notifyEmail,
     notifySms: u.notifySms,
+    password: u.password ?? null,
     initials: initialsOf(u.name),
   };
 }
@@ -434,6 +440,7 @@ export function createUser(input: {
   notifyEmail?: boolean;
   notifySms?: boolean;
   teamId?: number | null;
+  password?: string | null;
 }): User {
   const s = db();
   const user: StoredUser = {
@@ -444,6 +451,7 @@ export function createUser(input: {
     phone: input.phone?.trim() || null,
     notifyEmail: input.notifyEmail !== false,
     notifySms: !!input.notifySms,
+    password: input.password?.trim() || null,
     createdAt: new Date().toISOString(),
   };
   s.users.push(user);
@@ -603,6 +611,22 @@ export function createDecision(input: NewDecisionInput): Decision {
   save();
   logEvent(id, "created", input.recordedBy ?? "Folor Admin", "Decision recorded" + (projectId ? " on project" : ""));
   return getDecision(id)!;
+}
+
+export function deleteDecision(id: string): boolean {
+  const s = db();
+  const before = s.decisions.length;
+  s.decisions = s.decisions.filter((d) => d.id !== id);
+  if (s.decisions.length === before) return false;
+  // Detach references from other decisions and drop dependent records.
+  s.decisions.forEach((d) => {
+    if (d.causedById === id) d.causedById = null;
+  });
+  s.approvals = s.approvals.filter((a) => a.decisionId !== id);
+  s.notifications = s.notifications.filter((n) => n.decisionId !== id);
+  s.events = s.events.filter((ev) => ev.decisionId !== id);
+  save();
+  return true;
 }
 
 export function addEvidence(decisionId: string, evidence: Evidence): Decision | null {
@@ -817,7 +841,7 @@ export function markApprovalViewed(token: string): void {
 
 export function updateUser(
   id: number,
-  patch: Partial<Pick<StoredUser, "name" | "role" | "email" | "phone" | "notifyEmail" | "notifySms">>
+  patch: Partial<Pick<StoredUser, "name" | "role" | "email" | "phone" | "notifyEmail" | "notifySms" | "password">>
 ): User | null {
   const s = db();
   const u = s.users.find((x) => x.id === id);
@@ -826,6 +850,7 @@ export function updateUser(
   if (patch.role?.trim()) u.role = patch.role.trim();
   if (patch.email !== undefined) u.email = patch.email?.trim() || null;
   if (patch.phone !== undefined) u.phone = patch.phone?.trim() || null;
+  if (patch.password !== undefined) u.password = patch.password?.trim() || null;
   if (typeof patch.notifyEmail === "boolean") u.notifyEmail = patch.notifyEmail;
   if (typeof patch.notifySms === "boolean") u.notifySms = patch.notifySms;
   // Keep audit snapshots on pending approvals in sync with the person.
@@ -903,7 +928,8 @@ export interface SessionInfo {
 
 /**
  * Login rules (turnkey, prototype-grade):
- * - email "admin" (or any email) + the workspace admin password -> admin session
+ * - any email + the workspace admin password -> admin session
+ * - a person's email + their personal password -> member session
  * - a person's email + any of their teams' passwords -> member session
  */
 export function login(email: string, password: string): SessionInfo | null {
@@ -921,10 +947,11 @@ export function login(email: string, password: string): SessionInfo | null {
   } else {
     const u = s.users.find((x) => x.email?.toLowerCase() === e);
     if (!u) return null;
+    const personalOk = !!u.password && u.password === password;
     const teamOk = s.teams.some(
       (t) => t.password && t.password === password && t.memberIds.includes(u.id)
     );
-    if (!teamOk) return null;
+    if (!personalOk && !teamOk) return null;
     name = u.name;
   }
 
@@ -953,6 +980,16 @@ export function logout(token: string | undefined | null): void {
   const s = db();
   s.sessions = s.sessions.filter((x) => x.token !== token);
   save();
+}
+
+/** Self-service: a signed-in person sets their own login password. */
+export function setOwnPassword(email: string, password: string): boolean {
+  const s = db();
+  const u = s.users.find((x) => x.email?.toLowerCase() === email.trim().toLowerCase());
+  if (!u) return false;
+  u.password = password.trim();
+  save();
+  return true;
 }
 
 export function generatePassword(): string {

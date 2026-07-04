@@ -1,0 +1,4 @@
+# Force Railway (Nixpacks) to build this as a Node/Next.js app.
+# Without this, leftover Python files in the repo can make Railway
+# detect the wrong project type and fail to deploy.
+providers = ["node"]
