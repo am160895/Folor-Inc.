@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Mail, MessageSquare, ShieldCheck, Sparkles, Database, Check, Loader2, KeyRound, RefreshCw, Copy } from "lucide-react";
+import { Building2, Mail, MessageSquare, ShieldCheck, Sparkles, Database, Check, Loader2, KeyRound, RefreshCw, Copy, CreditCard, ExternalLink } from "lucide-react";
 import type { Team } from "@/lib/types";
 import type { ConfigStatus, WorkspaceSettings } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +45,15 @@ export function SettingsView({
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
+    onChanged();
+  }
+
+  async function setPlan(plan: "trial" | "pro") {
+    await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan }),
+    });
     onChanged();
   }
 
@@ -189,6 +198,49 @@ export function SettingsView({
               Generating a new password takes effect immediately — share it with the team.
             </p>
           </div>
+        </Panel>
+
+        <Panel icon={<CreditCard className="h-4 w-4" />} title="Plan & billing">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-foreground">Current plan</div>
+              <div className="text-xs text-muted-foreground">
+                $49 per recorder / month. Acknowledging and viewing are always free for
+                architects, owners and subs.
+              </div>
+            </div>
+            <Badge variant={settings.plan === "pro" ? "success" : "muted"}>
+              {settings.plan === "pro" ? "Pro" : "Trial"}
+            </Badge>
+          </div>
+          {settings.plan !== "pro" && (
+            <p className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-xs leading-relaxed text-amber-200/90">
+              Trial workspaces get the full product — evidence packages and audit
+              certificates carry a &quot;TRIAL&quot; watermark until you upgrade.
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {config.billingLink && settings.plan !== "pro" && (
+              <Button size="sm" onClick={() => window.open(config.billingLink!, "_blank")}>
+                <ExternalLink className="h-3.5 w-3.5" /> Upgrade — pay by card
+              </Button>
+            )}
+            {settings.plan !== "pro" ? (
+              <Button variant="outline" size="sm" onClick={() => setPlan("pro")}>
+                Mark workspace as Pro (paid)
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setPlan("trial")}>
+                Downgrade to trial
+              </Button>
+            )}
+          </div>
+          {!config.billingLink && (
+            <p className="mt-2 text-[11px] text-muted-foreground/70">
+              To take card payments here, create a Stripe payment link and set
+              STRIPE_PAYMENT_LINK in your hosting variables.
+            </p>
+          )}
         </Panel>
 
         <Panel icon={<Mail className="h-4 w-4" />} title="Email notifications">

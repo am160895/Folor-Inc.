@@ -144,6 +144,7 @@ interface Store {
 const DEFAULT_SETTINGS: WorkspaceSettings = {
   workspaceName: "Folor Inc.",
   adminPassword: "ledger123",
+  plan: "trial",
   currency: "$",
   autoTeam: true,
   requireReason: false,

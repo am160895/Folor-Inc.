@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     config: {
       emailConfigured: emailConfigured(),
       smsConfigured: smsConfigured(),
+      billingLink: process.env.STRIPE_PAYMENT_LINK || null,
     },
   });
 }

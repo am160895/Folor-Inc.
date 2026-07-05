@@ -155,6 +155,8 @@ export interface WorkspaceSettings {
   workspaceName: string;
   /** Master admin password for the workspace login. */
   adminPassword: string;
+  /** Billing plan — trial workspaces get a watermark on evidence packages. */
+  plan: "trial" | "pro";
   currency: string;
   autoTeam: boolean;
   requireReason: boolean;
@@ -164,6 +166,8 @@ export interface WorkspaceSettings {
 export interface ConfigStatus {
   emailConfigured: boolean;
   smsConfigured: boolean;
+  /** Optional Stripe payment link for upgrading (STRIPE_PAYMENT_LINK env). */
+  billingLink: string | null;
 }
 
 export interface Bootstrap {

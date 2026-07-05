@@ -267,8 +267,8 @@ export function PeopleView({
               >
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium text-foreground">{t.name}</div>
-                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {t.members.map((m) => m.name.split(" ")[0]).join(", ") || "No members"}
+                  <div className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                    {t.members.map((m) => m.name).join(", ") || "No members"}
                   </div>
                 </div>
                 <button

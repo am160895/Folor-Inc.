@@ -263,6 +263,7 @@ export function AppShell() {
         onChanged={refresh}
         editSignal={editSignal}
         isAdmin={data.me.isAdmin}
+        projects={data.projects}
       />
 
       <CaptureModal

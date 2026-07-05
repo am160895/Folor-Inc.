@@ -12,6 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     decision,
     hash: packageHash(params.id),
     workspace: getSettings().workspaceName,
+    plan: getSettings().plan,
     generatedAt: new Date().toISOString(),
   });
 }

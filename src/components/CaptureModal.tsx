@@ -131,8 +131,13 @@ export function CaptureModal({
   const recognitionRef = useRef<any>(null);
   const baseTextRef = useRef("");
 
+  const wantListenRef = useRef(false);
+
   const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
+    wantListenRef.current = false;
+    try {
+      recognitionRef.current?.stop();
+    } catch {}
     setListening(false);
   }, []);
 
@@ -140,13 +145,19 @@ export function CaptureModal({
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) {
       setSpeechSupported(false);
+      setError("This browser has no voice input — use Chrome, Edge or Safari, or type instead.");
       return;
     }
+    // Safari (Mac + iPhone/iPad) ends a session after every pause even in
+    // continuous mode, so we run short sessions there and auto-restart.
+    const ua = navigator.userAgent;
+    const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|Chromium|Edg|Android/.test(ua);
     const rec = new SR();
-    rec.continuous = true;
+    rec.continuous = !isSafari;
     rec.interimResults = true;
-    rec.lang = "en-US";
+    rec.lang = navigator.language?.toLowerCase().startsWith("en") ? navigator.language : "en-US";
     baseTextRef.current = text ? text.trim() + " " : "";
+    wantListenRef.current = true;
     rec.onresult = (e: any) => {
       let final = "";
       let interim = "";
@@ -157,17 +168,48 @@ export function CaptureModal({
       }
       setText((baseTextRef.current + final + interim).trimStart());
     };
-    rec.onend = () => setListening(false);
+    rec.onend = () => {
+      if (wantListenRef.current) {
+        // Absorb what we have so the next session appends instead of overwriting.
+        setText((t) => {
+          baseTextRef.current = t ? t.trim() + " " : "";
+          return t;
+        });
+        try {
+          rec.start();
+        } catch {
+          wantListenRef.current = false;
+          setListening(false);
+        }
+      } else {
+        setListening(false);
+      }
+    };
     rec.onerror = (e: any) => {
+      // Silence and aborts are normal pauses — onend will restart the session.
+      if (e.error === "no-speech" || e.error === "aborted") return;
+      wantListenRef.current = false;
       setListening(false);
-      if (e.error === "not-allowed") {
-        setError("Microphone access was blocked. Allow the mic in your browser, or type instead.");
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        setError("Microphone access was blocked. Allow the mic for this site in your browser settings, or type instead.");
+      } else if (e.error === "network") {
+        setError("Voice needs an internet connection — check your signal, or type instead.");
       }
     };
     recognitionRef.current = rec;
-    rec.start();
-    setListening(true);
+    try {
+      rec.start();
+      setListening(true);
+      setError(null);
+    } catch {
+      setListening(false);
+    }
   }, [text]);
+
+  // Never leave the mic running when the modal closes.
+  useEffect(() => {
+    if (!open) stopListening();
+  }, [open, stopListening]);
 
   // ---- lifecycle ------------------------------------------------------------
   useEffect(() => {

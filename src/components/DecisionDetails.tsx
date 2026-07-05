@@ -44,6 +44,7 @@ export function DecisionDetails({
   onChanged,
   editSignal,
   isAdmin,
+  projects,
 }: {
   decision: Decision | null;
   onClose: () => void;
@@ -52,6 +53,7 @@ export function DecisionDetails({
   /** Increment to open the editor programmatically (e.g. from a graph node). */
   editSignal?: number;
   isAdmin?: boolean;
+  projects?: { id: number; name: string }[];
 }) {
   const [explaining, setExplaining] = useState(false);
   const [explained, setExplained] = useState(false);
@@ -65,6 +67,7 @@ export function DecisionDetails({
     costImpact: "",
     scheduleImpact: "",
     origin: "",
+    projectId: "" as number | "",
   });
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -78,6 +81,7 @@ export function DecisionDetails({
       costImpact: decision.costImpact ?? "",
       scheduleImpact: decision.scheduleImpact ?? "",
       origin: decision.origin ?? "",
+      projectId: decision.projectId ?? "",
     });
     setEditing(true);
   }
@@ -96,6 +100,7 @@ export function DecisionDetails({
         costImpact: form.costImpact || null,
         scheduleImpact: form.scheduleImpact || null,
         origin: form.origin || null,
+        projectId: form.projectId === "" ? null : form.projectId,
       }),
     });
     setSavingEdit(false);
@@ -314,6 +319,22 @@ export function DecisionDetails({
                       />
                     </Field>
                   </div>
+                  <Field label="Project">
+                    <select
+                      value={form.projectId}
+                      onChange={(e) =>
+                        setForm({ ...form, projectId: e.target.value === "" ? "" : Number(e.target.value) })
+                      }
+                      className="h-10 w-full rounded-xl border border-border bg-white/[0.02] px-3 text-sm text-foreground outline-none focus:border-primary/50 [&>option]:bg-elevated"
+                    >
+                      <option value="">No project</option>
+                      {(projects ?? []).map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                   <Field label="Caused by (origin)">
                     <Input
                       value={form.origin}

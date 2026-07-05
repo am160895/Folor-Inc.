@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
     autoTeam: typeof body.autoTeam === "boolean" ? body.autoTeam : undefined,
     requireReason: typeof body.requireReason === "boolean" ? body.requireReason : undefined,
     defaultVisibility: body.defaultVisibility === "team" || body.defaultVisibility === "none" ? body.defaultVisibility : undefined,
+    plan: body.plan === "trial" || body.plan === "pro" ? body.plan : undefined,
   });
   return NextResponse.json({ settings });
 }

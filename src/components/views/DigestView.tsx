@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Send, Sunrise, CheckCheck, Clock3 } from "lucide-react";
+import { Send, Sunrise, CheckCheck, Clock3, ShieldCheck, FileCheck2, Banknote, Timer } from "lucide-react";
 import type { Decision } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { StatusPill, ImpactPill } from "@/components/shared";
@@ -18,6 +18,33 @@ export function DigestView({
   const pending = digest.filter((d) => d.status === "Pending").length;
   const [sent, setSent] = useState(false);
 
+  // ---- Protection report — what this record is worth -----------------------
+  const money = (v: string | null) => {
+    if (!v) return 0;
+    const m = v.replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
+    return m ? parseFloat(m[1]) : 0;
+  };
+  const exposure = decisions.reduce((sum, d) => sum + money(d.costImpact), 0);
+  const withApprovals = decisions.filter((d) => d.approvals.length > 0);
+  const acked = withApprovals.filter((d) => d.status === "Acknowledged").length;
+  const ackRate = withApprovals.length ? Math.round((acked / withApprovals.length) * 100) : null;
+  const responseHours: number[] = [];
+  decisions.forEach((d) =>
+    d.approvals.forEach((a) => {
+      if (a.respondedAt) {
+        const h = (new Date(a.respondedAt).getTime() - new Date(d.createdAt).getTime()) / 36e5;
+        if (h >= 0) responseHours.push(h);
+      }
+    })
+  );
+  const avgResponse = responseHours.length
+    ? responseHours.reduce((a, b) => a + b, 0) / responseHours.length
+    : null;
+  const evidenced = decisions.filter((d) => d.evidence.length > 0).length;
+  const fmtMoney = (n: number) =>
+    "$" + (n >= 1000 ? Math.round(n).toLocaleString("en-US") : n.toFixed(0));
+  const fmtHours = (h: number) => (h < 1 ? Math.max(1, Math.round(h * 60)) + "m" : h < 48 ? Math.round(h) + "h" : Math.round(h / 24) + "d");
+
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
       <div className="flex items-center gap-3 pt-4">
@@ -31,6 +58,54 @@ export function DigestView({
           </p>
         </div>
       </div>
+
+      {/* Protection report */}
+      <div className="mt-6 rounded-2xl border border-border/80 bg-card ring-hairline">
+        <div className="flex items-center gap-2 border-b border-border/60 px-5 py-3.5">
+          <ShieldCheck className="h-4 w-4 text-emerald-400" />
+          <span className="text-sm font-medium">Protection report</span>
+        </div>
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-b-2xl bg-border/40 sm:grid-cols-4">
+          <div className="bg-card p-4">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+              <Banknote className="h-3 w-3" /> $ on record
+            </div>
+            <div className="mt-1 text-xl font-semibold tracking-tight">{fmtMoney(exposure)}</div>
+            <div className="text-[11px] text-muted-foreground">cost impacts recorded</div>
+          </div>
+          <div className="bg-card p-4">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+              <CheckCheck className="h-3 w-3" /> Acknowledged
+            </div>
+            <div className="mt-1 text-xl font-semibold tracking-tight">
+              {ackRate === null ? "—" : ackRate + "%"}
+            </div>
+            <div className="text-[11px] text-muted-foreground">of decisions needing sign-off</div>
+          </div>
+          <div className="bg-card p-4">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+              <Timer className="h-3 w-3" /> Avg response
+            </div>
+            <div className="mt-1 text-xl font-semibold tracking-tight">
+              {avgResponse === null ? "—" : fmtHours(avgResponse)}
+            </div>
+            <div className="text-[11px] text-muted-foreground">from recorded to acknowledged</div>
+          </div>
+          <div className="bg-card p-4">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+              <FileCheck2 className="h-3 w-3" /> Evidence
+            </div>
+            <div className="mt-1 text-xl font-semibold tracking-tight">
+              {decisions.length ? Math.round((evidenced / decisions.length) * 100) + "%" : "—"}
+            </div>
+            <div className="text-[11px] text-muted-foreground">decisions carry evidence</div>
+          </div>
+        </div>
+      </div>
+      <p className="mt-2 px-1 text-[11px] leading-relaxed text-muted-foreground/70">
+        If any decision above is ever disputed, this record — who agreed, when, from where, with
+        what evidence — is what you hand over.
+      </p>
 
       <div className="mt-6 rounded-2xl border border-border/80 bg-card ring-hairline">
         <div className="flex items-center justify-between border-b border-border/60 px-5 py-3.5">

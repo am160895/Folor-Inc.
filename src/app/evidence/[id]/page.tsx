@@ -8,6 +8,7 @@ interface Pkg {
   decision: Decision;
   hash: string;
   workspace: string;
+  plan?: "trial" | "pro";
   generatedAt: string;
 }
 
@@ -81,7 +82,14 @@ export default function EvidencePage({ params }: { params: { id: string } }) {
       </div>
 
       {/* Paper sheet */}
-      <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 text-neutral-900 shadow-2xl print:max-w-none print:rounded-none print:p-6 print:shadow-none sm:p-10">
+      <div className="relative mx-auto max-w-3xl overflow-hidden rounded-2xl bg-white p-8 text-neutral-900 shadow-2xl print:max-w-none print:rounded-none print:p-6 print:shadow-none sm:p-10">
+        {pkg.plan !== "pro" && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <span className="rotate-[-28deg] text-[90px] font-black tracking-[0.3em] text-neutral-900/[0.06] print:text-neutral-900/[0.08]">
+              TRIAL
+            </span>
+          </div>
+        )}
         {/* Letterhead */}
         <div className="flex items-start justify-between border-b-2 border-neutral-900 pb-4">
           <div>
