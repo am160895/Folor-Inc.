@@ -6,7 +6,7 @@ import { ShieldCheck, TrendingUp, Clock3, FolderKanban, Plus, Check, ChevronRigh
 import type { Decision, Project } from "@/lib/types";
 import { CaptureBar } from "@/components/CaptureBar";
 import { DecisionCard } from "@/components/DecisionCard";
-import { Trash2 } from "lucide-react";
+import { Trash2, Check as CheckIcon, X as XIcon } from "lucide-react";
 import { AvatarStack } from "@/components/shared";
 
 export function DecisionsView({
@@ -241,20 +241,52 @@ function DeletableCard({
   isAdmin?: boolean;
   onDelete?: (d: Decision) => void;
 }) {
+  // In-app two-tap confirm — native confirm() dialogs are unreliable in
+  // installed home-screen apps on iOS, so we never rely on them.
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
   return (
     <div className="group/card relative">
       <DecisionCard decision={d} index={i} onClick={() => onOpen(d)} />
-      {isAdmin && onDelete && (
+      {isAdmin && onDelete && !confirming && (
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onDelete(d);
+            setConfirming(true);
+            setTimeout(() => setConfirming(false), 5000);
           }}
           title="Delete this decision"
           className="absolute bottom-3 right-3 rounded-lg p-1.5 text-muted-foreground/50 opacity-70 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover/card:opacity-100"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
+      )}
+      {isAdmin && onDelete && confirming && (
+        <div className="absolute bottom-2.5 right-2.5 flex items-center gap-1.5 rounded-lg border border-red-400/40 bg-red-500/10 px-2 py-1.5 backdrop-blur">
+          <span className="text-[11px] font-medium text-red-300">Delete?</span>
+          <button
+            disabled={busy}
+            onClick={async (e) => {
+              e.stopPropagation();
+              setBusy(true);
+              await onDelete(d);
+            }}
+            className="rounded-md bg-red-500 p-1 text-white disabled:opacity-50"
+            title="Yes, delete"
+          >
+            <CheckIcon className="h-3 w-3" strokeWidth={3} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirming(false);
+            }}
+            className="rounded-md border border-border/60 p-1 text-muted-foreground"
+            title="Cancel"
+          >
+            <XIcon className="h-3 w-3" />
+          </button>
+        </div>
       )}
     </div>
   );

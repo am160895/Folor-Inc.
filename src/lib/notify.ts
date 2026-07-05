@@ -1,3 +1,4 @@
+import nodemailer from "nodemailer";
 import type { Decision, User } from "./types";
 import { recordNotification, CONSENT_TEXT } from "./db";
 
@@ -15,7 +16,12 @@ import { recordNotification, CONSENT_TEXT } from "./db";
 // ---------------------------------------------------------------------------
 
 export function emailConfigured(): boolean {
-  return !!process.env.RESEND_API_KEY;
+  return !!process.env.RESEND_API_KEY || gmailConfigured();
+}
+
+/** Free path: a plain Gmail account + app password — no domain purchase needed. */
+function gmailConfigured(): boolean {
+  return !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 }
 
 export function smsConfigured(): boolean {
@@ -189,6 +195,7 @@ interface SendResult {
 
 async function sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
   if (!emailConfigured()) return { status: "demo" };
+  if (!process.env.RESEND_API_KEY && gmailConfigured()) return sendViaGmail(to, subject, html);
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -213,6 +220,25 @@ async function sendEmail(to: string, subject: string, html: string): Promise<Sen
     return { status: "failed", detail };
   } catch (e: any) {
     return { status: "failed", detail: e?.message ?? "Network error" };
+  }
+}
+
+async function sendViaGmail(to: string, subject: string, html: string): Promise<SendResult> {
+  try {
+    const user = process.env.GMAIL_USER!;
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user, pass: process.env.GMAIL_APP_PASSWORD! },
+    });
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || 'Folor Ledger <' + user + '>',
+      to,
+      subject,
+      html,
+    });
+    return { status: "sent" };
+  } catch (e: any) {
+    return { status: "failed", detail: e?.message ?? "Gmail send error" };
   }
 }
 

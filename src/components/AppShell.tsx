@@ -214,7 +214,6 @@ export function AppShell() {
                   onSelectProject={setProjectFilter}
                   isAdmin={data.me.isAdmin}
                   onDelete={async (d) => {
-                    if (!confirm(`Delete "${d.title}" and its records? This cannot be undone.`)) return;
                     await fetch(`/api/decisions/${d.id}`, { method: "DELETE" });
                     if (selectedId === d.id) setSelectedId(null);
                     await refresh();
@@ -237,7 +236,13 @@ export function AppShell() {
                 />
               )}
               {view === "stats" && (
-                <StatsView decisions={decisions} users={data.users} projects={data.projects} teams={data.teams} />
+                <StatsView
+                  decisions={decisions}
+                  users={data.users}
+                  projects={data.projects}
+                  teams={data.teams}
+                  onOpenDecision={(id) => setSelectedId(id)}
+                />
               )}
               {view === "people" && <PeopleView users={data.users} teams={data.teams} onChanged={refresh} />}
               {view === "digest" && (

@@ -56,6 +56,7 @@ export function DecisionDetails({
   projects?: { id: number; name: string }[];
 }) {
   const [explaining, setExplaining] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [explained, setExplained] = useState(false);
   const [tab, setTab] = useState<"details" | "graph" | "audit">("details");
   const [editing, setEditing] = useState(false);
@@ -113,6 +114,7 @@ export function DecisionDetails({
     setExplaining(false);
     setTab("details");
     setEditing(false);
+    setConfirmDelete(false);
   }, [decision?.id]);
 
   // Open the editor when asked from outside (graph node click).
@@ -184,18 +186,29 @@ export function DecisionDetails({
                     <Pencil className="h-4 w-4" />
                   </button>
                 )}
-                {isAdmin && (
+                {isAdmin && !confirmDelete && (
                   <button
-                    onClick={async () => {
-                      if (!confirm(`Delete "${decision.title}" and its records? This cannot be undone.`)) return;
-                      await fetch(`/api/decisions/${decision.id}`, { method: "DELETE" });
-                      onClose();
-                      onChanged?.();
+                    onClick={() => {
+                      setConfirmDelete(true);
+                      setTimeout(() => setConfirmDelete(false), 5000);
                     }}
                     title="Delete this decision"
                     className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-400"
                   >
                     <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+                {isAdmin && confirmDelete && (
+                  <button
+                    onClick={async () => {
+                      await fetch(`/api/decisions/${decision.id}`, { method: "DELETE" });
+                      setConfirmDelete(false);
+                      onClose();
+                      onChanged?.();
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg bg-red-500 px-2.5 py-1.5 text-xs font-semibold text-white"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Really delete?
                   </button>
                 )}
                 <button

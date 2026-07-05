@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   BarChart3,
   Banknote,
@@ -55,12 +55,15 @@ export function StatsView({
   users,
   projects,
   teams,
+  onOpenDecision,
 }: {
   decisions: Decision[];
   users: User[];
   projects: Project[];
   teams: Team[];
+  onOpenDecision?: (id: string) => void;
 }) {
+  const [drill, setDrill] = useState<{ title: string; items: Decision[] } | null>(null);
   const s = useMemo(() => {
     const total = decisions.length;
     const exposure = decisions.reduce((sum, d) => sum + money(d.costImpact), 0);
@@ -213,15 +216,41 @@ export function StatsView({
 
       {/* Headline tiles */}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Tile icon={<GitBranch className="h-3.5 w-3.5" />} label="Decisions" value={String(s.total)} sub={`${s.linked} linked in chains`} />
-        <Tile icon={<Banknote className="h-3.5 w-3.5" />} label="$ on record" value={fmtMoney(s.exposure)} sub={`${s.withCost.length} carry cost`} />
-        <Tile icon={<CheckCheck className="h-3.5 w-3.5" />} label="Acknowledgements" value={String(s.approved.length)} sub={`${s.declined.length} declined · ${s.allApprovals.length - s.responded.length} pending`} />
-        <Tile icon={<Timer className="h-3.5 w-3.5" />} label="Avg response" value={s.avgResponse === null ? "—" : fmtHours(s.avgResponse)} sub={s.medianResponse === null ? "no responses yet" : `median ${fmtHours(s.medianResponse)} · fastest ${fmtHours(s.fastest!)}`} />
-        <Tile icon={<Eye className="h-3.5 w-3.5" />} label="Open rate" value={pct(s.opened.length, s.allApprovals.length)} sub="approval links opened" />
-        <Tile icon={<FileCheck2 className="h-3.5 w-3.5" />} label="Evidence coverage" value={pct(s.evidenced, s.total)} sub={`${s.evidence.length} evidence items`} />
+        <Tile icon={<GitBranch className="h-3.5 w-3.5" />} label="Decisions" value={String(s.total)} sub={`${s.linked} linked in chains`} onClick={() => setDrill({ title: "All decisions", items: decisions })} />
+        <Tile icon={<Banknote className="h-3.5 w-3.5" />} label="$ on record" value={fmtMoney(s.exposure)} sub={`${s.withCost.length} carry cost`} onClick={() => setDrill({ title: "Decisions with cost on record", items: s.withCost })} />
+        <Tile icon={<CheckCheck className="h-3.5 w-3.5" />} label="Acknowledgements" value={String(s.approved.length)} sub={`${s.declined.length} declined · ${s.allApprovals.length - s.responded.length} pending`} onClick={() => setDrill({ title: "Decisions with acknowledgements", items: decisions.filter((d) => d.approvals.length > 0) })} />
+        <Tile icon={<Timer className="h-3.5 w-3.5" />} label="Avg response" value={s.avgResponse === null ? "—" : fmtHours(s.avgResponse)} sub={s.medianResponse === null ? "no responses yet" : `median ${fmtHours(s.medianResponse)} · fastest ${fmtHours(s.fastest!)}`} onClick={() => setDrill({ title: "Decisions with responses", items: decisions.filter((d) => d.approvals.some((a) => a.respondedAt)) })} />
+        <Tile icon={<Eye className="h-3.5 w-3.5" />} label="Open rate" value={pct(s.opened.length, s.allApprovals.length)} sub="approval links opened" onClick={() => setDrill({ title: "Decisions where links were opened", items: decisions.filter((d) => d.approvals.some((a) => a.viewedAt)) })} />
+        <Tile icon={<FileCheck2 className="h-3.5 w-3.5" />} label="Evidence coverage" value={pct(s.evidenced, s.total)} sub={`${s.evidence.length} evidence items`} onClick={() => setDrill({ title: "Decisions carrying evidence", items: decisions.filter((d) => d.evidence.length > 0) })} />
         <Tile icon={<Users className="h-3.5 w-3.5" />} label="People" value={String(users.length)} sub={`${teams.length} teams`} />
         <Tile icon={<FolderKanban className="h-3.5 w-3.5" />} label="Projects" value={String(projects.length)} sub={`${s.byProject.filter((p) => p.count > 0).length} active`} />
       </div>
+
+      {/* Drill-down: what's behind the number you clicked */}
+      {drill && (
+        <div className="mt-4 rounded-2xl border border-primary/30 bg-primary/[0.04] ring-hairline">
+          <div className="flex items-center justify-between border-b border-border/60 px-5 py-3">
+            <span className="text-sm font-medium">{drill.title} · {drill.items.length}</span>
+            <button onClick={() => setDrill(null)} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-white/5 hover:text-foreground">
+              Close ✕
+            </button>
+          </div>
+          <div className="max-h-72 divide-y divide-border/40 overflow-y-auto">
+            {drill.items.length === 0 && <p className="px-5 py-4 text-xs text-muted-foreground/70">Nothing here yet.</p>}
+            {drill.items.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => onOpenDecision?.(d.id)}
+                className="flex w-full items-center gap-3 px-5 py-2.5 text-left text-sm transition-colors hover:bg-white/[0.04]"
+              >
+                <span className="font-mono text-[11px] text-primary/80">{d.id}</span>
+                <span className="min-w-0 flex-1 truncate text-foreground/90">{d.title}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">{d.status}{d.costImpact ? ` · ${d.costImpact}` : ""}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Weekly activity */}
       <Section icon={<TrendingUp className="h-4 w-4" />} title="Recording activity — last 8 weeks">
@@ -239,13 +268,13 @@ export function StatsView({
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <Section icon={<CheckCheck className="h-4 w-4" />} title="By status">
           {Object.entries(s.byStatus).map(([k, v]) => (
-            <Bar key={k} label={k} value={v} max={s.total} />
+            <Bar key={k} label={k} value={v} max={s.total} onClick={() => setDrill({ title: `Status: ${k}`, items: decisions.filter((d) => d.status === k) })} />
           ))}
           {s.total === 0 && <Empty />}
         </Section>
         <Section icon={<Mic className="h-4 w-4" />} title="Where decisions come from">
           {Object.entries(s.origins).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
-            <Bar key={k} label={k} value={v} max={s.total} />
+            <Bar key={k} label={k} value={v} max={s.total} onClick={() => setDrill({ title: `Came from: ${k}`, items: decisions.filter((d) => (d.causedBy ? "Another decision" : d.origin || "Unspecified") === k) })} />
           ))}
           {s.total === 0 && <Empty />}
         </Section>
@@ -265,7 +294,11 @@ export function StatsView({
           </thead>
           <tbody className="divide-y divide-border/40">
             {s.byProject.map((p) => (
-              <tr key={p.name}>
+              <tr
+                key={p.name}
+                onClick={() => setDrill({ title: `Project: ${p.name}`, items: decisions.filter((d) => d.projectName === p.name) })}
+                className="cursor-pointer transition-colors hover:bg-white/[0.03]"
+              >
                 <td className="py-2 text-foreground/90">{p.name}</td>
                 <td className="py-2 text-right">{p.count}</td>
                 <td className="py-2 text-right">{fmtMoney(p.exposure)}</td>
@@ -282,13 +315,17 @@ export function StatsView({
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <Section icon={<Users className="h-4 w-4" />} title="Top recorders">
           {s.recorders.map(([name, n]) => (
-            <Bar key={name} label={name} value={n} max={s.recorders[0]?.[1] ?? 1} />
+            <Bar key={name} label={name} value={n} max={s.recorders[0]?.[1] ?? 1} onClick={() => setDrill({ title: `Recorded by ${name}`, items: decisions.filter((d) => d.recordedBy === name) })} />
           ))}
           {s.recorders.length === 0 && <Empty />}
         </Section>
         <Section icon={<CheckCheck className="h-4 w-4" />} title="Approver responsiveness">
           {s.approvers.map((a) => (
-            <div key={a.name} className="flex items-center justify-between py-1 text-sm">
+            <div
+              key={a.name}
+              onClick={() => setDrill({ title: `Approvals for ${a.name}`, items: decisions.filter((d) => d.approvals.some((x) => x.name === a.name)) })}
+              className="flex cursor-pointer items-center justify-between rounded-md px-1 -mx-1 py-1 text-sm transition-colors hover:bg-white/[0.04]"
+            >
               <span className="truncate text-foreground/90">{a.name}</span>
               <span className="shrink-0 text-xs text-muted-foreground">
                 {a.acks} responded{a.avg !== null ? ` · avg ${fmtHours(a.avg)}` : ""}{a.pending ? ` · ${a.pending} pending` : ""}
@@ -323,7 +360,10 @@ export function StatsView({
       {/* Biggest decision */}
       {s.largest && (
         <Section icon={<Banknote className="h-4 w-4" />} title="Largest cost on record">
-          <div className="text-sm text-foreground/90">
+          <div
+            onClick={() => onOpenDecision?.(s.largest!.id)}
+            className="cursor-pointer rounded-lg text-sm text-foreground/90 transition-colors hover:text-primary"
+          >
             <span className="font-mono text-primary/90">{s.largest.id}</span> — {s.largest.title}
             <span className="ml-2 font-semibold">{s.largest.costImpact}</span>
           </div>
@@ -334,7 +374,11 @@ export function StatsView({
       <Section icon={<ScrollText className="h-4 w-4" />} title={`Workspace activity log (${s.log.length} events)`}>
         <div className="max-h-96 space-y-0 overflow-y-auto pr-1">
           {s.log.slice(0, 200).map((ev, i) => (
-            <div key={ev.decisionId + "-" + ev.id + "-" + i} className="flex items-start gap-2.5 border-b border-border/30 py-2 text-xs last:border-0">
+            <div
+              key={ev.decisionId + "-" + ev.id + "-" + i}
+              onClick={() => onOpenDecision?.(ev.decisionId)}
+              className="flex cursor-pointer items-start gap-2.5 border-b border-border/30 py-2 text-xs transition-colors last:border-0 hover:bg-white/[0.03]"
+            >
               <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" />
               <div className="min-w-0 flex-1">
                 <span className="text-foreground/90">{ev.actor}</span>{" "}
@@ -362,9 +406,26 @@ export function StatsView({
   );
 }
 
-function Tile({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
+function Tile({
+  icon,
+  label,
+  value,
+  sub,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub?: string;
+  onClick?: () => void;
+}) {
   return (
-    <div className="rounded-2xl border border-border/80 bg-card p-4 ring-hairline">
+    <div
+      onClick={onClick}
+      className={`rounded-2xl border border-border/80 bg-card p-4 ring-hairline ${
+        onClick ? "cursor-pointer transition-colors hover:border-primary/40 hover:bg-elevated/60" : ""
+      }`}
+    >
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
         {icon} {label}
       </div>
@@ -386,9 +447,22 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
   );
 }
 
-function Bar({ label, value, max }: { label: string; value: number; max: number }) {
+function Bar({
+  label,
+  value,
+  max,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  onClick?: () => void;
+}) {
   return (
-    <div className="flex items-center gap-3 py-1">
+    <div
+      onClick={onClick}
+      className={`flex items-center gap-3 py-1 ${onClick ? "cursor-pointer rounded-md px-1 -mx-1 transition-colors hover:bg-white/[0.04]" : ""}`}
+    >
       <span className="w-28 shrink-0 truncate text-xs capitalize text-foreground/85">{label}</span>
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.05]">
         <div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, (value / Math.max(1, max)) * 100)}%` }} />
