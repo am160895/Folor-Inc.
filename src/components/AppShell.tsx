@@ -11,6 +11,7 @@ import {
   Users,
   Loader2,
   ChevronsUpDown,
+  BarChart3,
 } from "lucide-react";
 import { useState as useLocalState } from "react";
 import { Plus, Check, KeyRound, LogOut } from "lucide-react";
@@ -21,6 +22,7 @@ import { SearchView } from "@/components/views/SearchView";
 import { GraphView } from "@/components/views/GraphView";
 import { PeopleView } from "@/components/views/PeopleView";
 import { DigestView } from "@/components/views/DigestView";
+import { StatsView } from "@/components/views/StatsView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { DecisionDetails } from "@/components/DecisionDetails";
 import { CaptureModal } from "@/components/CaptureModal";
@@ -33,6 +35,7 @@ const MOBILE_NAV: { key: ViewKey; label: string; icon: typeof LayoutList }[] = [
   { key: "decisions", label: "Decisions", icon: LayoutList },
   { key: "search", label: "Search", icon: Search },
   { key: "graph", label: "Graph", icon: Share2 },
+  { key: "stats", label: "Stats", icon: BarChart3 },
   { key: "people", label: "People", icon: Users },
   { key: "digest", label: "Digest", icon: Sunrise },
   { key: "settings", label: "Settings", icon: Settings },
@@ -225,6 +228,9 @@ export function AppShell() {
                     setEditSignal((n) => n + 1);
                   }}
                 />
+              )}
+              {view === "stats" && (
+                <StatsView decisions={decisions} users={data.users} projects={data.projects} teams={data.teams} />
               )}
               {view === "people" && <PeopleView users={data.users} teams={data.teams} onChanged={refresh} />}
               {view === "digest" && (

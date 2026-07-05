@@ -99,6 +99,8 @@ export interface NotificationInfo {
   kind: "approval" | "fyi";
   destination: string;
   status: "sent" | "demo" | "failed";
+  /** Failure reason from the provider, when status is "failed". */
+  detail: string | null;
   createdAt: string;
 }
 

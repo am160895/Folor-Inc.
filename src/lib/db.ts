@@ -366,6 +366,7 @@ function mapDecision(d: StoredDecision): Decision {
       kind: n.kind,
       destination: n.destination,
       status: n.status,
+      detail: n.detail ?? null,
       createdAt: n.createdAt,
     }));
 

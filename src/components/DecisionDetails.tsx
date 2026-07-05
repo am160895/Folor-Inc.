@@ -585,8 +585,9 @@ export function DecisionDetails({
                     {decision.notifications.map((n) => (
                       <div
                         key={n.id}
-                        className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-white/[0.015] px-3 py-2 text-sm"
+                        className="rounded-lg border border-border/60 bg-white/[0.015] px-3 py-2 text-sm"
                       >
+                      <div className="flex items-center gap-2.5">
                         {n.channel === "email" ? (
                           <Mail className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         ) : (
@@ -606,6 +607,12 @@ export function DecisionDetails({
                         >
                           {n.status === "sent" ? "Sent" : n.status === "demo" ? "Demo" : "Failed"}
                         </Badge>
+                      </div>
+                      {n.status === "failed" && n.detail && (
+                        <div className="mt-1 pl-6 text-xs leading-relaxed text-amber-300/80">
+                          {n.detail}
+                        </div>
+                      )}
                       </div>
                     ))}
                   </div>

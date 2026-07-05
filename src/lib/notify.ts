@@ -49,7 +49,7 @@ export async function notifyApprovers(
       link;
 
     if (user.notifyEmail && user.email) {
-      const status = await sendEmail(
+      const r = await sendEmail(
         user.email,
         "Decision to approve: " + decision.title,
         approvalEmailHtml(decision, link)
@@ -61,12 +61,13 @@ export async function notifyApprovers(
         kind: "approval",
         destination: user.email,
         message: text,
-        status,
+        status: r.status,
+        detail: r.detail,
       });
     }
 
     if (user.notifySms && user.phone) {
-      const status = await sendSms(user.phone, text);
+      const r = await sendSms(user.phone, text);
       recordNotification({
         decisionId: decision.id,
         userId: user.id,
@@ -74,7 +75,8 @@ export async function notifyApprovers(
         kind: "approval",
         destination: user.phone,
         message: text,
-        status,
+        status: r.status,
+        detail: r.detail,
       });
     }
   }
@@ -95,7 +97,7 @@ export async function notifyWatchers(decision: Decision, watchers: User[]): Prom
       ': "' +
       decision.title +
       '" — you are on the visibility list. No action needed.';
-    const status = await sendEmail(
+    const r = await sendEmail(
       user.email,
       "Decision recorded: " + decision.title,
       fyiEmailHtml(decision)
@@ -107,7 +109,8 @@ export async function notifyWatchers(decision: Decision, watchers: User[]): Prom
       kind: "fyi",
       destination: user.email,
       message: text,
-      status,
+      status: r.status,
+      detail: r.detail,
     });
   }
 }
@@ -128,7 +131,7 @@ export async function sendInvite(opts: {
   const subject = opts.teamName
     ? "You've been added to " + opts.teamName + " on Ledger"
     : "You've been added to Ledger";
-  return sendEmail(opts.toEmail, subject, inviteEmailHtml(opts, base));
+  return (await sendEmail(opts.toEmail, subject, inviteEmailHtml(opts, base))).status;
 }
 
 function inviteEmailHtml(
@@ -160,12 +163,13 @@ function inviteEmailHtml(
   );
 }
 
-async function sendEmail(
-  to: string,
-  subject: string,
-  html: string
-): Promise<"sent" | "demo" | "failed"> {
-  if (!emailConfigured()) return "demo";
+interface SendResult {
+  status: "sent" | "demo" | "failed";
+  detail?: string;
+}
+
+async function sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
+  if (!emailConfigured()) return { status: "demo" };
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -180,14 +184,21 @@ async function sendEmail(
         html,
       }),
     });
-    return res.ok ? "sent" : "failed";
-  } catch {
-    return "failed";
+    if (res.ok) return { status: "sent" };
+    // Surface the provider's reason (e.g. Resend test mode can only email you).
+    let detail = "Provider returned " + res.status;
+    try {
+      const j = await res.json();
+      if (j?.message) detail = String(j.message);
+    } catch {}
+    return { status: "failed", detail };
+  } catch (e: any) {
+    return { status: "failed", detail: e?.message ?? "Network error" };
   }
 }
 
-async function sendSms(to: string, body: string): Promise<"sent" | "demo" | "failed"> {
-  if (!smsConfigured()) return "demo";
+async function sendSms(to: string, body: string): Promise<SendResult> {
+  if (!smsConfigured()) return { status: "demo" };
   try {
     const sid = process.env.TWILIO_ACCOUNT_SID!;
     const auth = Buffer.from(sid + ":" + process.env.TWILIO_AUTH_TOKEN).toString("base64");
@@ -202,9 +213,15 @@ async function sendSms(to: string, body: string): Promise<"sent" | "demo" | "fai
         body: new URLSearchParams({ To: to, From: process.env.TWILIO_FROM!, Body: body }),
       }
     );
-    return res.ok ? "sent" : "failed";
-  } catch {
-    return "failed";
+    if (res.ok) return { status: "sent" };
+    let detail = "Provider returned " + res.status;
+    try {
+      const j = await res.json();
+      if (j?.message) detail = String(j.message);
+    } catch {}
+    return { status: "failed", detail };
+  } catch (e: any) {
+    return { status: "failed", detail: e?.message ?? "Network error" };
   }
 }
 

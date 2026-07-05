@@ -13,6 +13,7 @@ import {
   Plus,
   Check,
   ChevronsUpDown,
+  BarChart3,
   LogOut,
   KeyRound,
   type LucideIcon,
@@ -21,12 +22,13 @@ import { cn } from "@/lib/utils";
 import { LedgerMark } from "@/components/shared";
 import type { Project } from "@/lib/types";
 
-export type ViewKey = "decisions" | "search" | "graph" | "people" | "digest" | "settings";
+export type ViewKey = "decisions" | "search" | "graph" | "stats" | "people" | "digest" | "settings";
 
 const NAV: { key: ViewKey; label: string; icon: LucideIcon }[] = [
   { key: "decisions", label: "Decisions", icon: LayoutList },
   { key: "search", label: "Search", icon: Search },
   { key: "graph", label: "Graph", icon: Share2 },
+  { key: "stats", label: "Stats", icon: BarChart3 },
   { key: "people", label: "People", icon: Users },
   { key: "digest", label: "Digest", icon: Sunrise },
   { key: "settings", label: "Settings", icon: Settings },
