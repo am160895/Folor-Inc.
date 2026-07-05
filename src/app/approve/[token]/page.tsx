@@ -58,6 +58,15 @@ export default function ApprovePage({ params }: { params: { token: string } }) {
       .catch((e) => setError(e.message));
   }, [params.token]);
 
+  // After a response, take them to the Ledger home page.
+  useEffect(() => {
+    if (!done || !data) return;
+    const t = setTimeout(() => {
+      window.location.href = "/";
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [done, data]);
+
   async function respond(action: "approved" | "declined") {
     setSubmitting(true);
     const r = await fetch(`/api/approvals/${params.token}`, {
@@ -227,6 +236,10 @@ export default function ApprovePage({ params }: { params: { token: string } }) {
               <span className="font-mono text-primary/90">{data.decision.id}</span> has been
               recorded and everyone on the decision can see it.
             </p>
+            <p className="mt-3 text-xs text-muted-foreground/70">Taking you to Ledger…</p>
+            <a href="/" className="mt-1 inline-block text-xs text-primary hover:underline">
+              Open Ledger now →
+            </a>
           </motion.div>
         )}
       </div>

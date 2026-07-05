@@ -6,6 +6,7 @@ import { ShieldCheck, TrendingUp, Clock3, FolderKanban, Plus, Check, ChevronRigh
 import type { Decision, Project } from "@/lib/types";
 import { CaptureBar } from "@/components/CaptureBar";
 import { DecisionCard } from "@/components/DecisionCard";
+import { Trash2 } from "lucide-react";
 import { AvatarStack } from "@/components/shared";
 
 export function DecisionsView({
@@ -16,6 +17,8 @@ export function DecisionsView({
   onCapture,
   onCreateProject,
   onSelectProject,
+  isAdmin,
+  onDelete,
 }: {
   decisions: Decision[];
   projects: Project[];
@@ -24,6 +27,8 @@ export function DecisionsView({
   onCapture: (mode: "speak" | "type" | "upload") => void;
   onCreateProject: (name: string) => Promise<void>;
   onSelectProject: (id: number | "all") => void;
+  isAdmin?: boolean;
+  onDelete?: (d: Decision) => void;
 }) {
   const [addingProject, setAddingProject] = useState(false);
   const [newName, setNewName] = useState("");
@@ -171,7 +176,7 @@ export function DecisionsView({
             ) : (
               <div className="space-y-3">
                 {items.map((d, i) => (
-                  <DecisionCard key={d.id} decision={d} index={i} onClick={() => onOpen(d)} />
+                  <DeletableCard key={d.id} d={d} i={i} onOpen={onOpen} isAdmin={isAdmin} onDelete={onDelete} />
                 ))}
               </div>
             )}
@@ -186,7 +191,7 @@ export function DecisionsView({
             </div>
             <div className="space-y-3">
               {unassigned.map((d, i) => (
-                <DecisionCard key={d.id} decision={d} index={i} onClick={() => onOpen(d)} />
+                <DeletableCard key={d.id} d={d} i={i} onOpen={onOpen} isAdmin={isAdmin} onDelete={onDelete} />
               ))}
             </div>
           </section>
@@ -219,6 +224,38 @@ function Stat({
       <div className="flex items-center gap-2 text-muted-foreground">{icon}</div>
       <div className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{value}</div>
       <div className="text-xs text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+function DeletableCard({
+  d,
+  i,
+  onOpen,
+  isAdmin,
+  onDelete,
+}: {
+  d: Decision;
+  i: number;
+  onOpen: (d: Decision) => void;
+  isAdmin?: boolean;
+  onDelete?: (d: Decision) => void;
+}) {
+  return (
+    <div className="group/card relative">
+      <DecisionCard decision={d} index={i} onClick={() => onOpen(d)} />
+      {isAdmin && onDelete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(d);
+          }}
+          title="Delete this decision"
+          className="absolute bottom-3 right-3 rounded-lg p-1.5 text-muted-foreground/50 opacity-70 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover/card:opacity-100"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

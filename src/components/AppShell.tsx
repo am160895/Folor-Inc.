@@ -194,15 +194,15 @@ export function AppShell() {
 
       <main className="relative z-10 flex-1 overflow-hidden pb-16 md:pb-0">
         <div className="h-full overflow-y-auto">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={view}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.22, ease: "easeOut" }}
-              className="h-full"
-            >
+          {/* No AnimatePresence here: exit animations can stall after long idle
+              periods (backgrounded tab), leaving every view blank. Enter-only. */}
+          <motion.div
+            key={view}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="h-full"
+          >
               {view === "decisions" && (
                 <DecisionsView
                   decisions={decisions}
@@ -212,6 +212,13 @@ export function AppShell() {
                   onCapture={openCapture}
                   onCreateProject={createProject}
                   onSelectProject={setProjectFilter}
+                  isAdmin={data.me.isAdmin}
+                  onDelete={async (d) => {
+                    if (!confirm(`Delete "${d.title}" and its records? This cannot be undone.`)) return;
+                    await fetch(`/api/decisions/${d.id}`, { method: "DELETE" });
+                    if (selectedId === d.id) setSelectedId(null);
+                    await refresh();
+                  }}
                 />
               )}
               {view === "search" && (
@@ -237,8 +244,7 @@ export function AppShell() {
                 <DigestView decisions={decisions} onOpen={(d) => setSelectedId(d.id)} />
               )}
               {view === "settings" && <SettingsView config={data.config} settings={data.settings} teams={data.teams} onChanged={refresh} />}
-            </motion.div>
-          </AnimatePresence>
+          </motion.div>
         </div>
       </main>
 

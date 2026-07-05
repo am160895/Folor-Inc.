@@ -163,6 +163,25 @@ function inviteEmailHtml(
   );
 }
 
+/** Email-verification message for self-service sign-ups. */
+export async function sendVerification(opts: {
+  toName: string;
+  toEmail: string;
+  workspaceName: string;
+  link: string;
+}): Promise<"sent" | "demo" | "failed"> {
+  const firstName = escapeHtml(opts.toName.split(" ")[0] || "there");
+  const html =
+    '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#111">' +
+    '<p style="font-size:13px;color:#666;margin:0 0 16px">' + escapeHtml(opts.workspaceName) + " · Ledger</p>" +
+    '<h2 style="margin:0 0 8px;font-size:20px">Hi ' + firstName + " — verify your email</h2>" +
+    '<p style="margin:0 0 16px;color:#444">Tap the button below to verify this address and open your Ledger account.</p>' +
+    '<a href="' + opts.link + '" style="display:inline-block;background:#6d4aff;color:#fff;text-decoration:none;padding:13px 24px;border-radius:10px;font-weight:600">Verify &amp; sign in</a>' +
+    '<p style="font-size:12px;color:#888;margin-top:16px">If you didn&#39;t request this, you can ignore this email.</p>' +
+    "</div>";
+  return (await sendEmail(opts.toEmail, "Verify your email for Ledger", html)).status;
+}
+
 interface SendResult {
   status: "sent" | "demo" | "failed";
   detail?: string;

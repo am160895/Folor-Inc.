@@ -132,7 +132,7 @@ export function DecisionFlow({
           jumpTo: decision.causedBy.id,
         },
       });
-      e.push(edge("causedBy", "center", false, true));
+      e.push(edge("causedBy", "center", false, true, "CAUSED BY"));
     } else if (decision.origin) {
       n.push({
         id: "origin",
@@ -156,7 +156,7 @@ export function DecisionFlow({
           jumpTo: ref.id,
         },
       });
-      e.push(edge("center", id, false, true));
+      e.push(edge("center", id, false, true, "LED TO"));
     });
 
     if (decision.people.length > 0) {
@@ -286,13 +286,28 @@ export function DecisionFlow({
   );
 }
 
-function edge(source: string, target: string, dashed = false, causal = false): Edge {
+function edge(
+  source: string,
+  target: string,
+  dashed = false,
+  causal = false,
+  label?: string
+): Edge {
   return {
     id: source + "-" + target,
     source,
     target,
     type: "smoothstep",
     animated: !dashed,
+    label,
+    labelStyle: label
+      ? { fill: "rgba(240,171,252,0.95)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em" }
+      : undefined,
+    labelBgStyle: label
+      ? { fill: "#17171e", fillOpacity: 0.9, stroke: "rgba(232,121,249,0.35)", strokeWidth: 1 }
+      : undefined,
+    labelBgPadding: label ? [6, 3] : undefined,
+    labelBgBorderRadius: label ? 6 : undefined,
     style: dashed
       ? { strokeDasharray: "4 4" }
       : causal

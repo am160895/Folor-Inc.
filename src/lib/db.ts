@@ -92,6 +92,14 @@ interface StoredTeam {
   createdAt: string;
 }
 
+interface StoredSignup {
+  token: string;
+  name: string;
+  email: string;
+  password: string;
+  createdAt: string;
+}
+
 interface StoredSession {
   token: string;
   email: string;
@@ -139,6 +147,7 @@ interface Store {
   settings: WorkspaceSettings;
   events: StoredEvent[];
   sessions: StoredSession[];
+  signups: StoredSignup[];
 }
 
 const DEFAULT_SETTINGS: WorkspaceSettings = {
@@ -192,6 +201,7 @@ function seedStore(): Store {
     settings: { ...DEFAULT_SETTINGS },
     events: [],
     sessions: [],
+    signups: [],
   };
 }
 
@@ -225,6 +235,7 @@ function normalize(s: Store): Store {
     if (u.password === undefined) u.password = null;
   });
   if (!Array.isArray((s as any).sessions)) (s as any).sessions = [];
+  if (!Array.isArray((s as any).signups)) (s as any).signups = [];
   if (!(s.nextIds as any).team) (s.nextIds as any).team = 1;
   s.settings = { ...DEFAULT_SETTINGS, ...(s.settings ?? {}) };
   return s;
@@ -982,6 +993,73 @@ export function logout(token: string | undefined | null): void {
   const s = db();
   s.sessions = s.sessions.filter((x) => x.token !== token);
   save();
+}
+
+/**
+ * Self-service sign-up: anyone can request access with their email. They only
+ * get in after clicking the verification link sent to that address. If the
+ * admin already added the person, verification simply claims that account.
+ */
+export function createSignup(
+  name: string,
+  email: string,
+  password: string
+): { token: string } | { error: string } {
+  const s = db();
+  const e = email.trim().toLowerCase();
+  const existing = s.users.find((u) => u.email?.toLowerCase() === e);
+  if (existing?.password) {
+    return { error: "That email already has an account — sign in instead." };
+  }
+  // One live signup per email; a new request replaces the old link.
+  s.signups = s.signups.filter((x) => x.email !== e);
+  const signup: StoredSignup = {
+    token: newToken(),
+    name: name.trim(),
+    email: e,
+    password: password.trim(),
+    createdAt: new Date().toISOString(),
+  };
+  s.signups.push(signup);
+  if (s.signups.length > 200) s.signups = s.signups.slice(-100);
+  save();
+  return { token: signup.token };
+}
+
+/** Complete a signup: create (or claim) the user and open a session. */
+export function verifySignup(token: string): SessionInfo | null {
+  const s = db();
+  const signup = s.signups.find((x) => x.token === token);
+  if (!signup) return null;
+  let user = s.users.find((u) => u.email?.toLowerCase() === signup.email);
+  if (user) {
+    if (!user.password) user.password = signup.password;
+    if (!user.name?.trim()) user.name = signup.name;
+  } else {
+    user = {
+      id: s.nextIds.user++,
+      name: signup.name || signup.email.split("@")[0],
+      role: "Team member",
+      email: signup.email,
+      phone: null,
+      notifyEmail: true,
+      notifySms: false,
+      password: signup.password,
+      createdAt: new Date().toISOString(),
+    };
+    s.users.push(user);
+  }
+  s.signups = s.signups.filter((x) => x.token !== token);
+  const session: StoredSession = {
+    token: newToken(),
+    email: signup.email,
+    name: user.name,
+    isAdmin: false,
+    createdAt: new Date().toISOString(),
+  };
+  s.sessions.push(session);
+  save();
+  return { token: session.token, email: session.email, name: session.name, isAdmin: false };
 }
 
 /** Self-service: a signed-in person sets their own login password. */
