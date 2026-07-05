@@ -112,6 +112,54 @@ export async function notifyWatchers(decision: Decision, watchers: User[]): Prom
   }
 }
 
+/**
+ * Invite email — sent when a person with an email address is added to the
+ * workspace or to a team. In demo mode (no RESEND_API_KEY) nothing is sent.
+ */
+export async function sendInvite(opts: {
+  toName: string;
+  toEmail: string;
+  workspaceName: string;
+  teamName?: string | null;
+  password?: string | null;
+  requestOrigin: string;
+}): Promise<"sent" | "demo" | "failed"> {
+  const base = process.env.APP_URL?.replace(/\/$/, "") || opts.requestOrigin;
+  const subject = opts.teamName
+    ? "You've been added to " + opts.teamName + " on Ledger"
+    : "You've been added to Ledger";
+  return sendEmail(opts.toEmail, subject, inviteEmailHtml(opts, base));
+}
+
+function inviteEmailHtml(
+  o: { toName: string; toEmail: string; workspaceName: string; teamName?: string | null; password?: string | null },
+  base: string
+): string {
+  const firstName = escapeHtml(o.toName.split(" ")[0]);
+  const teamLine = o.teamName
+    ? "You&#39;ve been added to the <strong>" + escapeHtml(o.teamName) + "</strong> team on "
+    : "You&#39;ve been added to ";
+  const passwordBlock = o.password
+    ? '<p style="margin:0 0 4px;font-size:14px;color:#444">Your password:</p>' +
+      '<p style="margin:0 0 16px;font-family:monospace;font-size:16px;font-weight:700;color:#111">' +
+      escapeHtml(o.password) +
+      "</p>"
+    : '<p style="margin:0 0 16px;font-size:13px;color:#666">Your admin will share your password with you. You can set your own from the key icon once you&#39;re in.</p>';
+  return (
+    '<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#111">' +
+    '<p style="font-size:13px;color:#666;margin:0 0 16px">' + escapeHtml(o.workspaceName) + " · Ledger</p>" +
+    '<h2 style="margin:0 0 8px;font-size:20px">Hi ' + firstName + " — you&#39;re in</h2>" +
+    '<p style="margin:0 0 16px;color:#444">' + teamLine + "<strong>" + escapeHtml(o.workspaceName) +
+    "</strong>&#39;s Ledger — where the team records project decisions so nothing important gets lost.</p>" +
+    '<p style="margin:0 0 4px;font-size:14px;color:#444">Sign in with your email:</p>' +
+    '<p style="margin:0 0 12px;font-family:monospace;font-size:15px;color:#111">' + escapeHtml(o.toEmail) + "</p>" +
+    passwordBlock +
+    '<a href="' + base + '" style="display:inline-block;background:#6d4aff;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600">Open Ledger</a>' +
+    '<p style="font-size:12px;color:#888;margin-top:16px">On your phone: open the link, then Share &rarr; Add to Home Screen to use it like an app.</p>' +
+    "</div>"
+  );
+}
+
 async function sendEmail(
   to: string,
   subject: string,

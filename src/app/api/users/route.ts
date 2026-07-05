@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sessionOf, unauthorized, forbidden } from "@/lib/auth";
-import { createUser, listUsers } from "@/lib/db";
+import { createUser, listUsers, listTeams, getSettings } from "@/lib/db";
+import { sendInvite } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -26,5 +27,21 @@ export async function POST(req: NextRequest) {
     teamId: typeof body.teamId === "number" ? body.teamId : null,
     password: body.password,
   });
-  return NextResponse.json({ user }, { status: 201 });
+  // Welcome email: tell the new person where to sign in and with what.
+  let inviteStatus: "sent" | "demo" | "failed" | null = null;
+  if (user.email) {
+    const team =
+      typeof body.teamId === "number"
+        ? listTeams().find((t) => t.id === body.teamId) ?? null
+        : null;
+    inviteStatus = await sendInvite({
+      toName: user.name,
+      toEmail: user.email,
+      workspaceName: getSettings().workspaceName,
+      teamName: team?.name ?? null,
+      password: user.password ?? team?.password ?? null,
+      requestOrigin: new URL(req.url).origin,
+    });
+  }
+  return NextResponse.json({ user, inviteStatus }, { status: 201 });
 }
