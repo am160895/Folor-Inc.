@@ -24,6 +24,17 @@ function gmailConfigured(): boolean {
   return !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 }
 
+/** The address notifications go out from, for display in Settings. */
+export function emailSender(): string | null {
+  if (process.env.RESEND_API_KEY) {
+    return process.env.EMAIL_FROM || "Folor Ledger <onboarding@resend.dev>";
+  }
+  if (gmailConfigured()) {
+    return process.env.EMAIL_FROM || process.env.GMAIL_USER!;
+  }
+  return null;
+}
+
 export function smsConfigured(): boolean {
   return !!(
     process.env.TWILIO_ACCOUNT_SID &&

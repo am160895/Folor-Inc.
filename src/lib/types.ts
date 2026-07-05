@@ -168,6 +168,8 @@ export interface WorkspaceSettings {
 export interface ConfigStatus {
   emailConfigured: boolean;
   smsConfigured: boolean;
+  /** The from-address notifications are sent with, when email is connected. */
+  emailSender: string | null;
   /** Optional Stripe payment link for upgrading (STRIPE_PAYMENT_LINK env). */
   billingLink: string | null;
 }

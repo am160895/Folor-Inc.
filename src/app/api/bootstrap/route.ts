@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sessionOf, unauthorized } from "@/lib/auth";
 import { listDecisions, listUsers, listProjects, listTeams, getSettings } from "@/lib/db";
-import { emailConfigured, smsConfigured } from "@/lib/notify";
+import { emailConfigured, smsConfigured, emailSender } from "@/lib/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     config: {
       emailConfigured: emailConfigured(),
       smsConfigured: smsConfigured(),
+      emailSender: emailSender(),
       billingLink: process.env.STRIPE_PAYMENT_LINK || null,
     },
   });

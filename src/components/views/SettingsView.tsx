@@ -246,24 +246,27 @@ export function SettingsView({
         <Panel icon={<Mail className="h-4 w-4" />} title="Email notifications">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-foreground">Resend</div>
+              <div className="text-sm font-medium text-foreground">Email provider</div>
               <div className="text-xs text-muted-foreground">
-                Approval requests are emailed to each person&apos;s address.
+                Invites, approval requests and FYIs are emailed to each person&apos;s address.
               </div>
             </div>
             <Badge variant={config.emailConfigured ? "success" : "muted"}>
               {config.emailConfigured ? "Connected" : "Demo mode"}
             </Badge>
           </div>
+          {config.emailConfigured && config.emailSender && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Sending as <span className="font-mono text-foreground/85">{config.emailSender}</span>
+            </p>
+          )}
           {!config.emailConfigured && (
             <ConfigHint>
-              Add to <code className="text-primary/90">decisiongraph/.env.local</code>:
+              Set variables where the app is hosted (e.g. Railway → Variables):
               <br />
-              <code>RESEND_API_KEY=re_…</code>
+              <code>GMAIL_USER=you@gmail.com</code> + <code>GMAIL_APP_PASSWORD=…</code> (free), or
               <br />
-              <code>EMAIL_FROM=&quot;Folor &lt;decisions@yourdomain.com&gt;&quot;</code>
-              <br />
-              Free key at resend.com — then restart the app.
+              <code>RESEND_API_KEY=re_…</code> + <code>EMAIL_FROM=&quot;Folor &lt;decisions@yourdomain.com&gt;&quot;</code>
             </ConfigHint>
           )}
         </Panel>
